@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Yet Another Magnet Search Engine</title>
+<style type="text/css" media="screen">
+body { margin:0; padding:0; }
+#wrap {
+  width: 980px;
+  margin: 5px auto;
+}
+#header {
+  height: 30px;
+}
+#main {
+  margin: 20px 10px;
+}
+#content {
+  min-height: 130px;
+  padding: 20px 5px;
+}
+#footer{
+    text-align:center;
+    font-size: 13px;
+    margin-top: 20px;
+    padding-top: 5px;
+    border-top: 1px solid #888;
+}
+.search-box #s_text {
+   width: 200px;
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+<div id="header">
+ <h2><a style="text-decoration:none;" href="/">Magnet Search Engine</a></h2>
+</div>
+<div id="main">
+<div class="search-box">
+   <form id="s_box" method="get" action="/e/http_handler:search" >
+        <input id="s_text" value="~s" name="q" type="text" />
+        <input id="s_submit" value="Search" type="submit" />
+    </form>
+</div>
+<div id="content">
+~s
+</div>
+    <div id="footer">
+        <a href="/e/http_handler:recent">New</a>
+        <a href="/e/http_handler:top">Top</a>
+        <a href="/e/http_handler:stats">Stats</a>
+        <span> &copy; Kevin Lynx 2013</span>
+    </div>
+</div>
+</div>
+</body>
+</html>
+
