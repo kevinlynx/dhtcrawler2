@@ -47,8 +47,7 @@ body { margin:0; padding:0; }
 ~s
 </div>
     <div id="footer">
-        <a href="/e/http_handler:recent">New</a>
-        <a href="/e/http_handler:top">Top</a>
+        <a href="/e/http_handler:today_top">Top</a>
         <a href="/e/http_handler:stats">Stats</a>
         <span> &copy; Kevin Lynx 2013</span>
     </div>

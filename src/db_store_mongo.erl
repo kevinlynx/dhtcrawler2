@@ -15,6 +15,7 @@
 		 index/2,
 		 search_announce_top/2,
 		 search_recently/2,
+		 search_newest_top/3,
 		 search/2]).
 -compile(export_all).
 -define(DBNAME, torrents).
@@ -64,6 +65,14 @@ search_announce_top(Conn, Count) ->
 % db.hashes.find({$query:{},$orderby:{created_at: 1}}).limit(10);
 search_recently(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {created_at, -1}},
+	List = mongo_do(Conn, fun() ->
+		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
+		mongo_cursor:rest(Cursor)
+	end),
+	[decode_torrent_item(Item) || Item <- List].
+
+search_newest_top(Conn, Count, DaySecs) ->	
+	Sel = {'$query', {created_at, {'$gt', DaySecs}}, '$orderby', {announce, -1}},
 	List = mongo_do(Conn, fun() ->
 		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
 		mongo_cursor:rest(Cursor)
@@ -168,7 +177,8 @@ decode_search_stats(Rets) ->
 	{Stats} = bson:lookup(stats, Rets),
 	{Found} = bson:lookup(nfound, Stats),
 	{Cost} = bson:lookup(timeMicros, Stats),
-	{Found, Cost}.
+	{Scanned} = bson:lookup(nscanned, Stats),
+	{Found, Cost, Scanned}.
 
 decode_search(Rets) ->
 	case bson:lookup(results, Rets) of

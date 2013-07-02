@@ -27,7 +27,8 @@ config_file_name() ->
 
 do_default_start(File) ->
 	List = [{start_port, 6776},
-		{node_count, 10},
+		{node_count, 50},
+		{hash_max_cache, 10},
 		{loglevel, 3},
 		{dbconn, 15},
 		{dbhost, "localhost"},
@@ -43,8 +44,9 @@ do_start(List) ->
 	DBConn = proplists:get_value(dbconn, List),
 	DBHost = proplists:get_value(dbhost, List),
 	DBPort = proplists:get_value(dbport, List),
+	HashMaxCache = proplists:get_value(hash_max_cache, List),
 	io:format("dhtcrawler startup ~p, ~p, ~p:~p~n", [StartPort, Count, DBHost, DBPort]),
-	crawler_sup:start_link({StartPort, Count, DBHost, DBPort, LogLevel, DBConn}).
+	crawler_sup:start_link({StartPort, Count, DBHost, DBPort, LogLevel, DBConn, HashMaxCache}).
 
 start() ->
 	error_logger:logfile({open, "crash.log"}),

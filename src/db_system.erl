@@ -98,3 +98,4 @@ stats_ensure_today(TodaySecs) ->
 			Doc	
 	end.
 
+

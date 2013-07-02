@@ -9,6 +9,7 @@
 		 index/3,
 		 stats/3,
 		 recent/3,
+		 today_top/3,
 		 top/3]).
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -import(torrent_file, [size_string/1]).
@@ -25,21 +26,32 @@ search(SessionID, _Env, Input) ->
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 top(SessionID, _Env, _Input) ->
-	Rets = torrent_index:top(),
+	Rets = db_frontend:all_top(),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Response = simple_html("top", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
+today_top(SessionID, _Env, _Input) ->
+	Rets = db_frontend:today_top(),
+	BodyList = format_search_result(Rets),
+	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
+	Response = simple_html("today_top", Body),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+
 recent(SessionID, _Env, _Input) ->
-	Rets = torrent_index:recent(),
+	Rets = db_frontend:newest(),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Response = simple_html("recent", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 stats(SessionID, _Env, _Input) ->
-	Body = ?TEXT("total ~p torrents", [torrent_index:count()]),
+	{TorSum, StatsList} = db_frontend:stats(),
+	Body = ?TEXT("<h3>total ~p torrents</h3>", [TorSum]) ++
+		"<ul>" ++ 
+		format_stats(StatsList) ++
+		"</ul>",
 	Response = simple_html("", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
@@ -78,10 +90,10 @@ test_search(Keyword) ->
 	file:write_file(Filename, simple_html(Keyword, Body)).
 
 do_search(Keyword) ->
-	{Rets, Stats} = torrent_index:search(Keyword),
-	{_Found, Cost} = Stats,
+	{Rets, Stats} = db_frontend:search(Keyword),
+	{_Found, Cost, Scanned} = Stats,
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds</h4>", 
-		[Keyword, length(Rets), Cost / 1000 / 1000]),
+		[Keyword, Scanned, Cost / 1000 / 1000]),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body.
@@ -123,7 +135,7 @@ format_file({Name, Length}) ->
 		[Name, size_string(Length)]).
 
 format_view(Hash) ->
-	case torrent_index:index(Hash) of
+	case db_frontend:search_one(Hash) of
 		{} -> "not found";
 		Torrent ->
 			format_torrent_detail(Torrent)
@@ -135,8 +147,20 @@ format_torrent_detail(Torrent) ->
 format_magnet(MagHash) ->
 	"magnet:?xt=urn:btih:" ++ MagHash.
 
+format_stats([]) ->
+	[];
+
+format_stats([{DaySec, Processed, RecvQuery, Updated, New}|Rest]) ->
+	?TEXT("<li>~s RecvQuery ~p ProcessedQuery ~p Updated ~p New ~p</li>", 
+		[format_date_string(DaySec), RecvQuery, Processed, Updated, New]) ++ 
+	format_stats(Rest).
+
 format_time_string(Secs) ->
 	{{Y, M, D}, {H, Min, Sec}} = time_util:seconds_to_local_time(Secs),
 	?TEXT("~b-~2..0b-~2..0b ~2..0b:~2..0b:~2..0b", 
 		[Y, M, D, H, Min, Sec]).
+
+format_date_string(Secs) ->
+	{{Y, M, D}, _} = time_util:seconds_to_local_time(Secs),
+	?TEXT("~b-~2..0b-~2..0b", [Y, M, D]).
 

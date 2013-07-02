@@ -37,7 +37,8 @@ srv_name() ->
 	crawler_http.
 
 init([DBHost, DBPort, Port]) ->
-	torrent_index:start_link(DBHost, DBPort),
+	process_flag(trap_exit, true),
+	db_frontend:start(DBHost, DBPort, 2),
 	{ok, Pid} = inets:start(httpd, [
   	{modules, [mod_alias, mod_auth, mod_esi, mod_actions,
   		mod_cgi, mod_dir, mod_get, mod_head, mod_log, mod_disk_log]},
@@ -69,7 +70,7 @@ handle_cast(_, State) ->
 
 terminate(_, State) ->
 	#state{httpid = Pid} = State,
-	torrent_index:stop(),
+	db_frontend:stop(),
 	inets:stop(httpd, Pid),
     {ok, State}.
 
