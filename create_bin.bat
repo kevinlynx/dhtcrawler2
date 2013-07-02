@@ -13,4 +13,7 @@ copy tools\*.* bin\
 mkdir bin\priv
 mkdir bin\ebin         
 copy ebin\*.* bin\ebin\
+mkdir bin\tools
+mkdir bin\tools\db-replset
+copy tools\db-replset\*.* bin\tools\db-replset\
 pause
