@@ -11,6 +11,7 @@
 		 stats_updated/1,
 		 stats_query_inserted/2,
 		 stats_day_at/2,
+		 stats_day_at_slave/2,
 		 stats_get_peers/1]).
 -define(DBNAME, dht_system).
 -define(COLLNAME, system).
@@ -84,6 +85,11 @@ stats_inc_field(Conn, Filed, Inc) ->
 
 stats_day_at(Conn, DaySec) ->
 	mongo:do(safe, master, Conn, ?DBNAME, fun() ->
+		stats_ensure_today(DaySec)
+	end).
+
+stats_day_at_slave(Conn, DaySec) ->
+	mongo:do(safe, slave_ok, Conn, ?DBNAME, fun() ->
 		stats_ensure_today(DaySec)
 	end).
 

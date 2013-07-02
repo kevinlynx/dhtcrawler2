@@ -13,9 +13,17 @@
 		 terminate/2]).
 -export([start/0, 
 		 start/3,
+		 start/1,
 		 page_temp/0,
 	     stop/0]).
 -record(state, {html_temp, httpid}).
+
+% start from command line, erl -run crawler_http start localhost 27017 8000
+start([DBHostS, DBPortS, PortS]) ->
+	DBHost = DBHostS,
+	DBPort = list_to_integer(DBPortS),
+	HttpPort = list_to_integer(PortS),
+	start(DBHost, DBPort, HttpPort).
 
 start(DBHost, DBPort, Port) ->
 	code:add_path("deps/bson/ebin"),

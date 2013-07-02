@@ -33,7 +33,7 @@ close(Conn) ->
 	mongo_connection:stop(Conn).
 
 count(Conn) ->
-	mongo_do(Conn, fun() ->
+	mongo_do_slave(Conn, fun() ->
 		mongo:count(?COLLNAME, {})
 	end).
 
@@ -47,14 +47,14 @@ exist(Conn, Hash) when is_list(Hash) ->
 search(Conn, Key) when is_list(Key) ->
 	BinColl = list_to_binary(atom_to_list(?COLLNAME)),
 	BinKey = list_to_binary(Key),
-	Ret = mongo_do(Conn, fun() ->
+	Ret = mongo_do_slave(Conn, fun() ->
 		mongo:command({text, BinColl, search, BinKey})
 	end),
 	{decode_search(Ret), decode_search_stats(Ret)}.
 
 search_announce_top(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {announce, -1}},
-	List = mongo_do(Conn, fun() ->
+	List = mongo_do_slave(Conn, fun() ->
 		% mongodb-erlang does not provide cursor.limit()/sort() functions, wired
 		% but it work here
 		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
@@ -65,7 +65,7 @@ search_announce_top(Conn, Count) ->
 % db.hashes.find({$query:{},$orderby:{created_at: 1}}).limit(10);
 search_recently(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {created_at, -1}},
-	List = mongo_do(Conn, fun() ->
+	List = mongo_do_slave(Conn, fun() ->
 		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
 		mongo_cursor:rest(Cursor)
 	end),
@@ -73,14 +73,14 @@ search_recently(Conn, Count) ->
 
 search_newest_top(Conn, Count, DaySecs) ->	
 	Sel = {'$query', {created_at, {'$gt', DaySecs}}, '$orderby', {announce, -1}},
-	List = mongo_do(Conn, fun() ->
+	List = mongo_do_slave(Conn, fun() ->
 		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
 		mongo_cursor:rest(Cursor)
 	end),
 	[decode_torrent_item(Item) || Item <- List].
 
 index(Conn, Hash) when is_list(Hash) ->
-	Ret = mongo_do(Conn, fun() ->
+	Ret = mongo_do_slave(Conn, fun() ->
 		mongo:find_one(?COLLNAME, {'_id', list_to_binary(Hash)})
 	end),
 	case Ret of 
@@ -167,6 +167,9 @@ find_exist(Conn, Hash) ->
 
 mongo_do(Conn, Fun) ->
 	mongo:do(safe, master, Conn, ?DBNAME, Fun).
+
+mongo_do_slave(Conn, Fun) ->
+	mongo:do(safe, slave_ok, Conn, ?DBNAME, Fun).
 
 % TODO: replace this with {'_id', ID}
 hash_selector(Hash) ->

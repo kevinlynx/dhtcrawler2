@@ -1,2 +1,2 @@
-erl -pa ebin -noshell -s crawler_http start
+erl -pa ebin -noshell -run crawler_http start localhost 27017 8000
 

@@ -49,8 +49,8 @@ stats() ->
 	Conn = mongo_pool:get(?DB_POOLNAME),
 	DaySecs = time_util:now_day_seconds(),
 	TorSum = db_store_mongo:count(Conn),
-	D1 = db_system:stats_day_at(Conn, DaySecs),
-	D2 = db_system:stats_day_at(Conn, DaySecs - ?ONEDAY_SECS),
+	D1 = db_system:stats_day_at_slave(Conn, DaySecs),
+	D2 = db_system:stats_day_at_slave(Conn, DaySecs - ?ONEDAY_SECS),
 	{TorSum, [decode_stats(D1), decode_stats(D2)]}.
 
 decode_stats(Stats) ->
