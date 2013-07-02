@@ -18,7 +18,7 @@
 -record(state, {downloader, dbpool, downloading = 0}).
 -include("db_common.hrl").
 % if there's no hash, wait some time
--define(WAIT_TIME, 2*60*1000).
+-define(WAIT_TIME, 1*60*1000).
 % the max concurrent download tasks
 -define(MAX_DOWNLOAD, 50).
 
