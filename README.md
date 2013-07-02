@@ -30,7 +30,7 @@ Also you can check more technique information at my blog site (Chinese) [codemac
 
 Most config value is in `priv/dhtcrawler.config`, when you first run dhtcrawler, this file will be generated automatically. And the other config values are passed by arguments to erlang functions. In most case you don't need to change these config values, except these network addresses.
 
-## Mongodb Repla set
+## Mongodb Replica set
 
 It's not related about dhtcrawler, but only Mongodb, try figure it yourself.
 
