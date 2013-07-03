@@ -15,6 +15,7 @@
 		 stop/0,
 		 search/1,
 		 today_top/0]).
+-export([async_update/2]).
 -record(state, {cache}).
 -define(OUT_OF_DATE, 5*60*1000).
 -define(CACHE_SIZE, 1000).
@@ -31,12 +32,8 @@ search(Key) ->
 today_top() ->
 	gen_server:call(srv_name(), {query, top}).
 
-async_top() ->
-	gen_server:cast(srv_name(), {update, top}).
-
 init([]) ->
-	async_top(),
-	{ok, #state{cache = gb_trees:empty()}}.
+	{ok, #state{cache = gb_trees:empty()}, 0}.
 
 srv_name() ->
 	http_cache.
@@ -50,7 +47,7 @@ code_change(_, _, State) ->
 handle_cast(decrease_cache, State) ->
 	#state{cache = Cache} = State,
 	NewCache = remove_oldest(Cache),
-	async_top(), % make sure `top' exists
+	spawn_update(top), % make sure `top' exists
 	{noreply, State#state{cache = NewCache}};
 
 handle_cast({update, Type}, State) ->
@@ -67,6 +64,15 @@ handle_call({query, Type}, _From, State) ->
 handle_call(_, _From, State) ->
 	{noreply, State}.
 
+handle_info(timeout, State) ->
+	spawn_update(top),
+	{noreply, State};
+
+handle_info({enter_cache, Type, Val}, State) ->
+	#state{cache = Cache} = State,
+	NewCache = gb_trees:enter(Type, Val, Cache),
+	{noreply, State#state{cache = NewCache}};
+
 handle_info(_, State) ->
 	{noreply, State}.
 
@@ -82,7 +88,7 @@ query(Type, State) ->
 update(Type, #state{cache = Cache} = State) ->
 	Ret = do_update(Type),
 	Val = {now(), Ret},
-	io:format("update cache ~p~n", [Type]),
+	io:format("sync update cache ~p~n", [Type]),
 	NewCache = gb_trees:enter(Type, Val, Cache),
 	case gb_trees:size(NewCache) >= ?CACHE_SIZE of
 		true -> 
@@ -102,7 +108,7 @@ do_query(Type, #state{cache = Cache} = State) ->
 	{Start, Ret} = gb_trees:get(Type, Cache),
 	case is_outofdate(Start) of
 		true ->
-			gen_server:cast(self(), {update, Type});
+			spawn_update(Type);
 		false ->
 			ok
 	end,
@@ -122,3 +128,14 @@ remove_oldest(Cache) ->
 
 compare_keyval({_, {T1, _}}, {_, {T2, _}}) ->
 	T1 =< T2.
+
+spawn_update(Type) ->
+	spawn(?MODULE, async_update, [Type, self()]).
+
+async_update(Type, From) ->
+	Start = now(),
+	Ret = do_update(Type),
+	From ! {enter_cache, Type, Ret},
+	io:format("async update cache ~p done used ~p ms~n", 
+		[Type, timer:now_diff(now(), Start) div 1000]).
+
