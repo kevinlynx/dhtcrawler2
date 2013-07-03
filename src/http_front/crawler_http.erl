@@ -47,6 +47,7 @@ srv_name() ->
 init([DBHost, DBPort, Port]) ->
 	process_flag(trap_exit, true),
 	db_frontend:start(DBHost, DBPort, 2),
+	http_cache:start_link(),
 	{ok, Pid} = inets:start(httpd, [
   	{modules, [mod_alias, mod_auth, mod_esi, mod_actions,
   		mod_cgi, mod_dir, mod_get, mod_head, mod_log, mod_disk_log]},

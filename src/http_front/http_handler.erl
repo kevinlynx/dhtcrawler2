@@ -33,7 +33,7 @@ top(SessionID, _Env, _Input) ->
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 today_top(SessionID, _Env, _Input) ->
-	Rets = db_frontend:today_top(),
+	Rets = http_cache:today_top(),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Response = simple_html("today_top", Body),
@@ -90,7 +90,7 @@ test_search(Keyword) ->
 	file:write_file(Filename, simple_html(Keyword, Body)).
 
 do_search(Keyword) ->
-	{Rets, Stats} = db_frontend:search(Keyword),
+	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds</h4>", 
 		[Keyword, Scanned, Cost / 1000 / 1000]),
