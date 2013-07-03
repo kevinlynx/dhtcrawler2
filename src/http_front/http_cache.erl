@@ -68,8 +68,9 @@ handle_info(timeout, State) ->
 	spawn_update(top),
 	{noreply, State};
 
-handle_info({enter_cache, Type, Val}, State) ->
+handle_info({enter_cache, Type, Time, Ret}, State) ->
 	#state{cache = Cache} = State,
+	Val = {Time, Ret},
 	NewCache = gb_trees:enter(Type, Val, Cache),
 	{noreply, State#state{cache = NewCache}};
 
@@ -136,7 +137,7 @@ async_update(Type, From) ->
 	Start = now(),
 	io:format("async update cache ~p start~n", [Type]),
 	Ret = do_update(Type),
-	From ! {enter_cache, Type, Ret},
+	From ! {enter_cache, Type, now(), Ret},
 	io:format("async update cache ~p done used ~p ms~n", 
 		[Type, timer:now_diff(now(), Start) div 1000]).
 
