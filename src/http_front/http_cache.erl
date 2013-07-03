@@ -134,6 +134,7 @@ spawn_update(Type) ->
 
 async_update(Type, From) ->
 	Start = now(),
+	io:format("async update cache ~p start~n", [Type]),
 	Ret = do_update(Type),
 	From ! {enter_cache, Type, Ret},
 	io:format("async update cache ~p done used ~p ms~n", 
