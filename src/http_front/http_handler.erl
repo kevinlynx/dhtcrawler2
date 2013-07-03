@@ -8,6 +8,7 @@
 		 test_search/1,
 		 index/3,
 		 stats/3,
+		 real_stats/3,
 		 recent/3,
 		 today_top/3,
 		 top/3]).
@@ -47,13 +48,20 @@ recent(SessionID, _Env, _Input) ->
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 stats(SessionID, _Env, _Input) ->
-	{TorSum, StatsList} = db_frontend:stats(),
+	Response = format_stats_list(http_cache:stats()),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+
+real_stats(SessionID, _Env, _Input) ->
+	Response = format_stats_list(db_frontend:stats()),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+
+format_stats_list(Stats) ->
+	{TorSum, StatsList} = Stats,
 	Body = ?TEXT("<h3>total ~p torrents</h3>", [TorSum]) ++
 		"<ul>" ++ 
 		format_stats(StatsList) ++
 		"</ul>",
-	Response = simple_html("", Body),
-	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+	simple_html("", Body).
 
 index(SessionID, _Env, Input) ->
 	Body = case get_index_hash(Input) of
@@ -88,6 +96,9 @@ test_search(Keyword) ->
 	Filename = ?TEXT("search_~s.html", [Keyword]),
 	Body = do_search(Keyword),
 	file:write_file(Filename, simple_html(Keyword, Body)).
+
+do_search(Keyword) when length(Keyword) =< 1 ->
+	too_short_tip();
 
 do_search(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
@@ -164,3 +175,6 @@ format_date_string(Secs) ->
 	{{Y, M, D}, _} = time_util:seconds_to_local_time(Secs),
 	?TEXT("~b-~2..0b-~2..0b", [Y, M, D]).
 
+too_short_tip() ->
+	"too short keyword, you're going to kill me, enjoy this " ++ 
+	"<a href='/e/http_handler:search?q=girl'>girl</a>".

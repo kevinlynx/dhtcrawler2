@@ -51,7 +51,8 @@ stats() ->
 	TorSum = db_store_mongo:count(Conn),
 	D1 = db_system:stats_day_at_slave(Conn, DaySecs),
 	D2 = db_system:stats_day_at_slave(Conn, DaySecs - ?ONEDAY_SECS),
-	{TorSum, [decode_stats(D1), decode_stats(D2)]}.
+	D3 = db_system:stats_day_at_slave(Conn, DaySecs - 2 * ?ONEDAY_SECS),
+	{TorSum, [decode_stats(D1), decode_stats(D2), decode_stats(D3)]}.
 
 decode_stats(Stats) ->
 	{DaySec} = bson:lookup('_id', Stats),

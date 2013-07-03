@@ -26,3 +26,7 @@
     [debug_info,   
 		{i, "include"},
     	{outdir,"ebin"}]}.
+{'src/local_torrent/*',
+    [debug_info,   
+		{i, "include"},
+    	{outdir,"ebin"}]}.

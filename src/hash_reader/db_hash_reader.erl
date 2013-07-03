@@ -67,7 +67,6 @@ handle_info(_, State) ->
 	{noreply, State}.
 
 handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
-	#state{downloader = DownPid} = State,
 	Conn = db_conn(State),
 	{Hash} = bson:lookup(hash, Doc),
 	ListHash = binary_to_list(Hash),
@@ -82,7 +81,7 @@ handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
 			State;
 		false ->
 			?T(?FMT("start to download the torrent ~s", [ListHash])),
-			try_download(State, DownPid, ListHash, Doc)
+			try_download(State, ListHash, Doc)
 	end,
 	{noreply, NewState};
 
@@ -92,7 +91,7 @@ handle_cast(stop, State) ->
 handle_call(_, _From, State) ->
 	{noreply, State}.
 
-try_download(State, Pid, Hash, Doc) ->
+try_download(State, Hash, Doc) ->
 	#state{downloading = D} = State,
 	Conn = db_conn(State),
 	NewDownloading = case D >= ?MAX_DOWNLOAD of
@@ -100,10 +99,21 @@ try_download(State, Pid, Hash, Doc) ->
 			insert_to_download_wait(Conn, Doc),
 			D;
 		false -> % download it now
-			tor_download:download(Pid, Hash),
+			do_download(State, Hash),
 			D + 1
 	end,
 	State#state{downloading = NewDownloading}.
+
+% and now we can retrieve the torrent from local cache
+do_download(State, Hash) ->
+	#state{downloader = Pid} = State,
+	Conn = db_conn(State),
+	case db_loc_torrent:load(Conn, Hash) of
+		not_found -> % not in the local cache, download it now
+			tor_download:download(Pid, Hash);
+		Content -> % process later
+			self() ! {got_torrent, ok, Hash, Content}
+	end.
 
 try_save(State, Hash, Name, Length, Files) ->
 	Conn = db_conn(State),

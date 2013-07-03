@@ -14,10 +14,11 @@
 -export([start_link/0, 
 		 stop/0,
 		 search/1,
+		 stats/0,
 		 today_top/0]).
 -export([async_update/2]).
 -record(state, {cache}).
--define(OUT_OF_DATE, 5*60*1000).
+-define(OUT_OF_DATE, 10*60*1000).
 -define(CACHE_SIZE, 1000).
 
 start_link() ->
@@ -31,6 +32,9 @@ search(Key) ->
 
 today_top() ->
 	gen_server:call(srv_name(), {query, top}).
+
+stats() ->
+	gen_server:call(srv_name(), {query, stats}).
 
 init([]) ->
 	{ok, #state{cache = gb_trees:empty()}, 0}.
@@ -48,6 +52,7 @@ handle_cast(decrease_cache, State) ->
 	#state{cache = Cache} = State,
 	NewCache = remove_oldest(Cache),
 	spawn_update(top), % make sure `top' exists
+	spawn_update(stats),
 	{noreply, State#state{cache = NewCache}};
 
 handle_cast({update, Type}, State) ->
@@ -66,6 +71,7 @@ handle_call(_, _From, State) ->
 
 handle_info(timeout, State) ->
 	spawn_update(top),
+	spawn_update(stats),
 	{noreply, State};
 
 handle_info({enter_cache, Type, Time, Ret}, State) ->
@@ -103,17 +109,22 @@ do_update({search, Key}) ->
 	db_frontend:search(Key);
 
 do_update(top) ->
-	db_frontend:today_top().
+	db_frontend:today_top();
+
+do_update(stats) ->
+	db_frontend:stats().
 
 do_query(Type, #state{cache = Cache} = State) ->
 	{Start, Ret} = gb_trees:get(Type, Cache),
-	case is_outofdate(Start) of
+	NewCache = case is_outofdate(Start) of
 		true ->
-			spawn_update(Type);
+			spawn_update(Type),
+			% update the time so that it will not be scheduled more time
+			gb_trees:enter(Type, {now(), Ret}, Cache);
 		false ->
-			ok
+			Cache
 	end,
-	{State, Ret}.
+	{State#state{cache = NewCache}, Ret}.
 
 is_outofdate(Time) ->
 	(timer:now_diff(now(), Time) div 1000) > ?OUT_OF_DATE.
