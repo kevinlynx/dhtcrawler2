@@ -45,6 +45,9 @@ start_link(IP, Port, Size) ->
 start_link(IP, Port, Size, OtherProcess) ->
 	PoolName = mongodb_conn_pool_name,
 	mongo_sup:start_pool(PoolName, 5, {IP, Port}),
+	% ensure index
+	Conn = mongo_pool:get(PoolName),
+	db_store_mongo:init(Conn),
 	supervisor:start_link({local, srv_name()}, ?MODULE, [PoolName, Size, OtherProcess]).
 
 srv_name() ->

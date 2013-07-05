@@ -25,9 +25,14 @@
 init(Host, Port) ->
 	{ok, Conn} = mongo_connection:start_link({Host, Port}),
 	?I(?FMT("connect mongodb ~p:~p success", [Host, Port])),
+	init(Conn),
+	Conn.
+
+init(Conn) ->
 	enable_text_search(Conn),
 	ensure_search_index(Conn),
-	Conn.
+	% TODO: numid index ?	
+	ok.
 
 close(Conn) ->
 	mongo_connection:stop(Conn).
@@ -89,16 +94,15 @@ index(Conn, Hash) when is_list(Hash) ->
 	end.
 
 insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
-	NewDoc = create_torrent_desc(Hash, Name, Length, 1, Files),
+	NewDoc = create_torrent_desc(Conn, Hash, Name, Length, 1, Files),
 	mongo_do(Conn, fun() ->
-		%mongo:insert(?COLLNAME, NewDoc)
-		% since the doc may already exist (inc_announce failed), i update the doc here
+		% the doc may already exist because the other process has inserted before
 		Sel = {'_id', list_to_binary(Hash)},
 		mongo:update(?COLLNAME, Sel, NewDoc, true)
 	end).
 
 unsafe_insert(Conn, Tors) when is_list(Tors) ->
-	Docs = [create_torrent_desc(Hash, Name, Length, 1, Files) || 
+	Docs = [create_torrent_desc(Conn, Hash, Name, Length, 1, Files) || 
 				{Hash, Name, Length, Files} <- Tors],
 	mongo:do(unsafe, master, Conn, ?DBNAME, fun() ->
 		mongo:insert(?COLLNAME, Docs)
@@ -135,7 +139,7 @@ enable_text_search(Conn) ->
 		mongo:command(Cmd)
 	end).
 
-create_torrent_desc(Hash, Name, Length, Announce, Files) ->
+create_torrent_desc(Conn, Hash, Name, Length, Announce, Files) ->
 	NameArray = case string_split:split(Name) of
 		{error, L, D} ->
 			?E(?FMT("string split failed(error): ~p ~p", [L, D])),
@@ -146,6 +150,8 @@ create_torrent_desc(Hash, Name, Length, Announce, Files) ->
 		{ok, R} -> R 
 	end,
 	{'_id', list_to_binary(Hash),
+      % steven told me it's necessary for sphinx, what if the doc already exists ?
+	  numid, db_system:get_torrent_id(Conn), 
 	  name, list_to_binary(Name),
 	  name_array, NameArray,
 	  length, Length,

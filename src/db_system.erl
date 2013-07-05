@@ -13,11 +13,30 @@
 		 stats_day_at/2,
 		 stats_day_at_slave/2,
 		 stats_get_peers/1]).
+-export([get_torrent_id/1]).
+-compile(export_all).
 -define(DBNAME, dht_system).
 -define(COLLNAME, system).
 -define(HASH_BATCH_KEY, <<"hashbatch">>).
 -define(STATS_COLLNAME, stats).
+-define(TORRENT_ID_KEY, <<"torrentid">>).
 
+% increase the seed and return the new id
+get_torrent_id(Conn) ->
+	Cmd = {findAndModify, ?COLLNAME, query, {'_id', ?TORRENT_ID_KEY},
+		update, {'$inc', {seed, 1}}, new, false, upsert, true},
+	Ret = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
+		mongo:command(Cmd)
+	end),
+	case bson:lookup(value, Ret) of
+		{undefined} ->
+			0;
+		{} ->
+			0;
+		{Obj} ->
+			{Seed} = bson:lookup(seed, Obj),
+			Seed
+	end.
 
 %% batch index
 inc_batch_rindex(Conn) ->
@@ -103,5 +122,11 @@ stats_ensure_today(TodaySecs) ->
 		{Doc} ->
 			Doc	
 	end.
+
+%%
+test_torrent_id() ->
+	{ok, Conn} = mongo_connection:start_link({localhost, 27017}),
+	ID = get_torrent_id(Conn),
+	ID.
 
 
