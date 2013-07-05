@@ -16,8 +16,9 @@
 		 stop/0,
 		 handle_update/0,
 		 handle_insert/0,
+		 handle_used_cache/0,
 		 dump/0]).
--record(state, {tref, count, start, name, updated = 0, inserted = 0}).
+-record(state, {tref, count, start, name, cache_used = 0, updated = 0, inserted = 0}).
 -define(STATS_INTERVAL, 10*60*1000).
 -define(TEXT(Fmt, Arg), lists:flatten(io_lib:format(Fmt, Arg))).
 
@@ -38,6 +39,9 @@ handle_update() ->
 
 handle_insert() ->
 	gen_server:cast(srv_name(), inc_inserted).
+
+handle_used_cache() ->
+	gen_server:cast(srv_name(), inc_cache_used).
 
 srv_name() ->
 	?MODULE.
@@ -73,6 +77,10 @@ handle_cast(inc_updated, State) ->
 handle_cast(inc_inserted, State) ->
 	#state{inserted = I} = State,
 	{noreply, State#state{inserted = I + 1}};
+
+handle_cast(inc_cache_used, State) ->
+	#state{cache_used = C} = State,
+	{noreply, State#state{cache_used = C + 1}};
 	
 handle_cast(stop, State) ->
 	{stop, normal, State}.
@@ -104,18 +112,22 @@ date_string() ->
     	[Year, Month, Day, Hour, Min, Sec])).
 
 format_stats(State) ->
-	#state{count = C, start = Start, updated = U, inserted = I} = State,
+	#state{count = C, start = Start, cache_used = Cache, updated = U, inserted = I} = State,
 	{Day, {H, M, S}} = stats_time(Start),
 	Mins = Day * 24 * 60 + H * 60 + M,
 	TotalMins = if Mins > 0 -> Mins; true -> 1 end,
 	Speed = (U + I) div TotalMins,
+	InsertPercent = I * 100 / (if U > 0 -> U; true -> 1 end),
+	CachePercent = Cache * 100 / (if I > 0 -> I; true -> 1 end),
 	?TEXT("  stats time ~b ~2.10.0b:~2.10.0b:~2.10.0b~n", 
 		[Day, H, M, S]) ++
 	?TEXT("  Reader count ~p~n", [C]) ++
 	?TEXT("  Process speed ~p req/min~n", [Speed]) ++
 	?TEXT("  Download torrents speed ~p tor/min~n", [I div TotalMins]) ++
 	?TEXT("  Updated ~p~n", [U]) ++
-	?TEXT("  Inserted ~p~n", [I]).
+	?TEXT("  Inserted ~p~n", [I]) ++
+	?TEXT("  Inserted percentage ~.2f%~n", [InsertPercent]) ++
+	?TEXT("  Used cache torrents ~p (~.2f%)~n", [Cache, CachePercent]).
 
 format_download_stats() ->
 	Start = now(),	

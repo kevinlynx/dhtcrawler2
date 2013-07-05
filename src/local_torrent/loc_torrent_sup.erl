@@ -32,10 +32,12 @@ start_standalone(IP, Port, Size) ->
 	io:format("db: ~p:~p downloader count ~p~n", [IP, Port, Size]),
 	start_dep_apps(),
 	tor_download:start_global(),
+	config:start_link("torcache.config", fun() -> config_default() end),
 	start_link(IP, Port, Size, []).
 
 start_link(IP, Port, Size) ->
-	start_link(IP, Port, Size, []).
+	OtherProcess = [],
+	start_link(IP, Port, Size, OtherProcess).
 
 start_link(IP, Port, Size, OtherProcess) ->
 	PoolName = loc_torrent_db_pool,
@@ -56,4 +58,10 @@ create_child(PoolName, Index) ->
 
 child_id(Index) ->
 	list_to_atom(lists:flatten(io_lib:format("loc_torrent_~p", [Index]))).
+
+config_default() ->
+	[{save_to_db, false},
+	 {save_to_file, true},
+	 {torrent_path, "torrents/"}].
+
 

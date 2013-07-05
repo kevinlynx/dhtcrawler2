@@ -21,6 +21,7 @@
 -define(WAIT_TIME, 1*60*1000).
 % the max concurrent download tasks
 -define(MAX_DOWNLOAD, 50).
+-define(DOWNLOAD_INTERVAL, 100).
 
 start_link(DBPool) ->
 	gen_server:start_link(?MODULE, [DBPool], []).
@@ -47,16 +48,17 @@ handle_info({got_torrent, failed, _Hash}, State) ->
 	{noreply, State#state{downloading = D - 1}};
 
 handle_info({got_torrent, ok, Hash, Content}, State) ->
-	#state{downloading = D} = State,
 	Conn = db_conn(State),
-	try_next_download(Conn),
-	case catch(torrent_file:parse(Content)) of
-		{'EXIT', _} ->
-			State;
-		{Type, Info} -> 
-			got_torrent(State, Hash, Type, Info)
-	end,
-	{noreply, State#state{downloading = D - 1}};
+	% save the torrent file
+	SaveTor = config:get(save_torrent, true),
+	if SaveTor -> loc_torrent_cache:save(Conn, Hash, Content); true -> ok end,
+	NewState = got_torrent_content(Conn, State, Hash, Content),
+	{noreply, NewState};
+
+handle_info({got_torrent_from_cache, Hash, Content}, State) ->
+	Conn = db_conn(State),
+	NewState = got_torrent_content(Conn, State, Hash, Content),
+	{noreply, NewState};
 
 handle_info(timeout, State) ->
 	Conn = db_conn(State),
@@ -65,6 +67,24 @@ handle_info(timeout, State) ->
 
 handle_info(_, State) ->
 	{noreply, State}.
+
+% when there's no hash to process
+handle_cast(process_download_hash, State) ->
+	#state{downloading = D} = State,
+	NewD = case D >= ?MAX_DOWNLOAD of
+		true ->
+			% the only thing we can do is just wait
+			timer:send_after(?WAIT_TIME, timeout),
+			D;
+		false ->
+			% launch downloader
+			Conn = db_conn(State),
+			try_next_download(Conn),
+			% until the max downloader count reaches
+			timer:send_after(?DOWNLOAD_INTERVAL, process_download_hash),
+			D + 1
+	end,
+	{noreply, State#state{downloading = NewD}};
 
 handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
 	Conn = db_conn(State),
@@ -93,9 +113,9 @@ handle_call(_, _From, State) ->
 
 try_download(State, Hash, Doc) ->
 	#state{downloading = D} = State,
-	Conn = db_conn(State),
 	NewDownloading = case D >= ?MAX_DOWNLOAD of
 		true -> % put it into the download queue
+			Conn = db_conn(State),
 			insert_to_download_wait(Conn, Doc),
 			D;
 		false -> % download it now
@@ -108,11 +128,12 @@ try_download(State, Hash, Doc) ->
 do_download(State, Hash) ->
 	#state{downloader = Pid} = State,
 	Conn = db_conn(State),
-	case db_loc_torrent:load(Conn, Hash) of
+	case loc_torrent_cache:load(Conn, Hash) of
 		not_found -> % not in the local cache, download it now
 			tor_download:download(Pid, Hash);
 		Content -> % process later
-			self() ! {got_torrent, ok, Hash, Content}
+			on_used_cache(),
+			self() ! {got_torrent_from_cache, Hash, Content}
 	end.
 
 try_save(State, Hash, Name, Length, Files) ->
@@ -123,6 +144,9 @@ try_save(State, Hash, Name, Length, Files) ->
 		_ -> 
 			on_saved(Conn)
 	end.
+
+on_used_cache() ->
+	hash_reader_stats:handle_used_cache().
 
 on_saved(Conn) ->
 	% `get_peers' here means we have processed a request
@@ -137,6 +161,17 @@ on_updated(Conn) ->
 	% also increase the updated counter
 	db_system:stats_updated(Conn),
 	hash_reader_stats:handle_update().
+
+got_torrent_content(Conn, State, MagHash, Content) ->
+	#state{downloading = D} = State,
+	try_next_download(Conn),
+	case catch(torrent_file:parse(Content)) of
+		{'EXIT', _} ->
+			skip;
+		{Type, Info} -> 
+			got_torrent(State, MagHash, Type, Info)
+	end,
+	State#state{downloading = D - 1}.
 
 got_torrent(State, Hash, single, {Name, Length}) ->
 	try_save(State, Hash, Name, Length, []);
@@ -162,6 +197,7 @@ try_next_download(Conn) ->
 	end),
 	schedule_next(Doc, true).
 
+% if there's no hash, try `wait_download' 
 try_next(Conn) ->
 	Doc = mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
 		D = mongo:find_one(?HASH_COLLNAME, {}),
@@ -181,7 +217,7 @@ schedule_next({}, true) ->
 	ok;
 
 schedule_next({}, false) ->
-	timer:send_after(?WAIT_TIME, timeout);
+	gen_server:cast(self(), process_download_hash);
 
 schedule_next({Doc}, DownloadDoc) ->
 	gen_server:cast(self(), {process_hash, Doc, DownloadDoc}).

@@ -43,16 +43,16 @@ handle_call(_, _From, State) ->
 	{noreply, State}.
 
 handle_info({got_torrent, failed, _Hash}, State) ->
-	#state{downcount = C} = State,
 	{_, NewState} = download_next(State),
-	{noreply, NewState#state{downcount = C - 1}};
+	#state{downcount = NewC} = NewState,
+	{noreply, NewState#state{downcount = NewC - 1}};
 
 handle_info({got_torrent, ok, Hash, Content}, State) ->
-	#state{downcount = C} = State,
 	Conn = db_conn(State),
-	db_loc_torrent:save(Conn, Hash, Content),
+	loc_torrent_cache:save(Conn, Hash, Content),
 	{_, NewState} = download_next(State),
-	{noreply, NewState#state{downcount = C - 1}};
+	#state{downcount = NewC} = NewState,
+	{noreply, NewState#state{downcount = NewC - 1}};
 
 handle_info(timeout, State) ->
 	{Status, NewState} = download_next(State),
@@ -80,6 +80,7 @@ download_next(#state{downcount = Count} = State) when Count < ?MAX_DOWNLOAD ->
 	{Status, State#state{downcount = NewCount}};
 
 download_next(State) ->
+	wait_download(),
 	{wait, State}.
 
 wait_download() ->

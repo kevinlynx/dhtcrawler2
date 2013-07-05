@@ -32,6 +32,7 @@ start_standalone(IP, Port, Size) ->
 	filelib:ensure_dir("log/"),
 	start_dep_apps(),
 	tor_download:start_global(),
+	config:start_link("hash_reader.config", fun() -> config_default() end),
 	% NOTE:
 	Stats = {db_hash_reader_stats, {hash_reader_stats, start_link, [Size]}, permanent, 2000, worker, [hash_reader_stats]},
 	DownloadStats = {tor_download_stats, {tor_download_stats, start_link, []}, permanent, 2000, worker, [tor_download_stats]},
@@ -61,3 +62,8 @@ create_child(PoolName, Index) ->
 child_id(Index) ->
 	list_to_atom(lists:flatten(io_lib:format("db_hash_reader_~p", [Index]))).
 
+config_default() ->
+	[{save_torrent, true},
+	 {save_to_db, false},
+	 {save_to_file, true},
+	 {torrent_path, "torrents/"}].
