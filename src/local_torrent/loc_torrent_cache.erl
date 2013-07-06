@@ -17,16 +17,20 @@ save(Conn, MagHash, Content) when is_list(MagHash), length(MagHash) == 40 ->
 	ok.
 
 load(Conn, MagHash) when is_list(MagHash), length(MagHash) == 40 ->
+	LoadDB = config:get(load_from_db, false),
 	case load_from_file(MagHash) of
-		not_found ->
+		not_found when LoadDB ->
 			db_loc_torrent:load(Conn, MagHash);
+		not_found ->
+			not_found;
 		Content ->
 			Content
 	end.
 
 %% TODO: put these file-realted codes to another module
 save_to_file(MagHash, Content) ->
-	FileName = torrent_file_name(MagHash),
+	{Path, FileName} = torrent_file_name(MagHash),
+	filelib:ensure_dir(Path),
 	case file:write_file(FileName, Content) of
 		ok -> ok;
 		{error, Reason} ->
@@ -34,7 +38,7 @@ save_to_file(MagHash, Content) ->
 	end.
 		
 load_from_file(MagHash) ->
-	FileName = torrent_file_name(MagHash),
+	{_, FileName} = torrent_file_name(MagHash),
 	case file:read_file(FileName) of
 		{ok, Content} ->
 			Content;
@@ -47,5 +51,5 @@ torrent_file_name(MagHash) ->
 	Path = config:get(torrent_path, "torrents/"),
 	FullPath = Path ++ lists:sublist(MagHash, 1, 2) ++ "/" ++ 
 		lists:sublist(MagHash, 3, 2) ++ "/",
-	filelib:ensure_dir(FullPath),
-	FullPath ++ MagHash ++ ".torrent".
+	{FullPath, FullPath ++ MagHash ++ ".torrent"}.
+

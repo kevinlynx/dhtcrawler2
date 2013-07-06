@@ -69,4 +69,5 @@ config_default() ->
 	[{save_torrent, true},
 	 {save_to_db, false},
 	 {save_to_file, true},
+	 {load_from_db, false},
 	 {torrent_path, "torrents/"}].
