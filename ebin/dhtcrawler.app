@@ -1,6 +1,6 @@
 {application,dhtcrawler,
              [{description,"A DHT crawler to index magnet hash to torrent"},
-              {vsn,"1a9f38d"},
+              {vsn,"8ee2e54"},
               {registered,[dht_crawler_sup]},
               {applications,[kernel,stdlib,crypto,public_key,ssl,inets,bson,
                              mongodb]},
@@ -11,5 +11,5 @@
                         db_store_mongo,db_system,dht_monitor,
                         hash_reader_stats,http_cache,http_handler,loc_torrent,
                         loc_torrent_cache,loc_torrent_sup,string_split,
-                        time_util,tor_download,tor_download_stats,
+                        time_util,tor_builder,tor_download,tor_download_stats,
                         torrent_file,transfer,urldecode,vlog]}]}.
