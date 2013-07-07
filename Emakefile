@@ -30,3 +30,7 @@
     [debug_info,   
 		{i, "include"},
     	{outdir,"ebin"}]}.
+{'src/tor_builder/*',
+    [debug_info,   
+		{i, "include"},
+    	{outdir,"ebin"}]}.
