@@ -119,11 +119,11 @@ format_one_result({multi, Hash, {Name, Files}, Announce, CTime}, ShowAll) ->
 	format_one_result(Hash, Name, Files, Announce, CTime, ShowAll).
 
 format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
-	?TEXT("<li><p style=\"font-size: 120%;\">
+	?TEXT("<li><p class=\"search-title\">
 		<a target='_blank' href=\"/e/http_handler:index?q=~s\">~s</a></p><ul>~s</ul>",
 		[Hash, Name, format_files(Files, ShowAll)]) ++
-	?TEXT("<p style=\"font-size:80%\">Index at: ~s  |  File count: ~p  |  Announce count: ~p
-		<a href=\"~s\" style=\"font-size:120%\">  Download</a></p>",
+	?TEXT("<p class=\"search-detail\">Index at: ~s  |  File count: ~p  |  Query count: ~p
+		<a href=\"~s\" class=\"download-tip\">  Download</a></p>",
 		[format_time_string(CTime), length(Files), Announce, format_magnet(Hash)]).
 
 format_files(Files, false) ->
@@ -142,7 +142,7 @@ format_file({more, Len}) ->
 	?TEXT("<li>...~b more files</li>", [Len]);
 
 format_file({Name, Length}) ->
-	?TEXT("<li>~s <span style=\"color:#888;\">~s</span></li>", 
+	?TEXT("<li>~s <span class=\"file-size\">~s</span></li>", 
 		[Name, size_string(Length)]).
 
 format_view(Hash) ->

@@ -16,7 +16,9 @@
 -define(ONEDAY_SECS, 24*60*60).
 
 start(IP, Port, PoolSize) ->
-	mongo_sup:start_pool(?DB_POOLNAME, PoolSize, {IP, Port}).
+	mongo_sup:start_pool(?DB_POOLNAME, PoolSize, {IP, Port}),
+	Conn = mongo_pool:get(?DB_POOLNAME),
+	db_store_mongo:init(Conn).
 
 stop() ->
 	mongo_sup:stop_pool(?DB_POOLNAME).

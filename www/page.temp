@@ -29,6 +29,18 @@ body { margin:0; padding:0; }
 .search-box #s_text {
    width: 200px;
 }
+p.search-title {
+  font-size:120%;
+}
+p.search-detail {
+  font-size:80%;
+}
+a.download-tip {
+  font-size:110%;
+}
+span.file-size {
+  color:#888;
+}
 </style>
 </head>
 <body>
