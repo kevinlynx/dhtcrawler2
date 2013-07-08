@@ -1,3 +1,7 @@
+## 07.08.2013
+
+* add torrent importer which can import local torrents into torrents database
+
 ## 07.05.2013
 
 * add torrent downloader which will download torrents and store them in database or local file system
