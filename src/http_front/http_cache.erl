@@ -93,9 +93,12 @@ query(Type, State) ->
 	end.
 
 update(Type, #state{cache = Cache} = State) ->
+	Start = now(),
+	io:format("sync update cache ~p start~n", [Type]),
 	Ret = do_update(Type),
 	Val = {now(), Ret},
-	io:format("sync update cache ~p~n", [Type]),
+	io:format("sync update cache ~p done used ~p ms~n", [Type, 
+		timer:now_diff(now(), Start) div 1000]),
 	NewCache = gb_trees:enter(Type, Val, Cache),
 	case gb_trees:size(NewCache) >= ?CACHE_SIZE of
 		true -> 

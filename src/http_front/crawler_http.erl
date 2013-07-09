@@ -12,28 +12,29 @@
 		 code_change/3, 
 		 terminate/2]).
 -export([start/0, 
-		 start/3,
+		 start/4,
 		 start/1,
 		 page_temp/0,
 	     stop/0]).
 -record(state, {html_temp, httpid}).
 
-% start from command line, erl -run crawler_http start localhost 27017 8000
-start([DBHostS, DBPortS, PortS]) ->
+% start from command line, erl -run crawler_http start localhost 27017 8000 5
+start([DBHostS, DBPortS, PortS, PoolSizeS]) ->
 	DBHost = DBHostS,
 	DBPort = list_to_integer(DBPortS),
 	HttpPort = list_to_integer(PortS),
-	start(DBHost, DBPort, HttpPort).
+	PoolSize = list_to_integer(PoolSizeS),
+	start(DBHost, DBPort, HttpPort, PoolSize).
 
-start(DBHost, DBPort, Port) ->
+start(DBHost, DBPort, Port, PoolSize) ->
 	code:add_path("deps/bson/ebin"),
 	code:add_path("deps/mongodb/ebin"),
 	Apps = [crypto, public_key, ssl, inets, bson, mongodb],	
 	[application:start(App) || App <- Apps],
-	gen_server:start({local, srv_name()}, ?MODULE, [DBHost, DBPort, Port], []).
+	gen_server:start({local, srv_name()}, ?MODULE, [DBHost, DBPort, Port, PoolSize], []).
 
 start() ->
-	start(localhost, 27017, 8000).
+	start(localhost, 27017, 8000, 5).
 
 stop() ->
 	gen_server:cast(srv_name(), stop).
@@ -44,9 +45,9 @@ page_temp() ->
 srv_name() ->
 	crawler_http.
 
-init([DBHost, DBPort, Port]) ->
+init([DBHost, DBPort, Port, PoolSize]) ->
 	process_flag(trap_exit, true),
-	db_frontend:start(DBHost, DBPort, 2),
+	db_frontend:start(DBHost, DBPort, PoolSize),
 	http_cache:start_link(),
 	{ok, Pid} = inets:start(httpd, [
   	{modules, [mod_alias, mod_auth, mod_esi, mod_actions,
