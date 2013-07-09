@@ -160,5 +160,5 @@ try_save([]) ->
 	ok;
 try_save(Tors) ->
 	Conn = mongo_pool:get(?DBPOOL),
-	db_store_mongo:unsafe_insert(Conn, Tors).
-
+	[db_store_mongo:insert(Conn, Hash, Name, Length, Files) ||
+		{Hash, Name, Length, Files} <- Tors].

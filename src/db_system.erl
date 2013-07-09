@@ -24,15 +24,15 @@
 % increase the seed and return the new id
 get_torrent_id(Conn) ->
 	Cmd = {findAndModify, ?COLLNAME, query, {'_id', ?TORRENT_ID_KEY},
-		update, {'$inc', {seed, 1}}, new, false, upsert, true},
+		update, {'$inc', {seed, 1}}, new, true, upsert, true},
 	Ret = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
 		mongo:command(Cmd)
 	end),
 	case bson:lookup(value, Ret) of
 		{undefined} ->
-			0;
+			1;
 		{} ->
-			0;
+			1;
 		{Obj} ->
 			{Seed} = bson:lookup(seed, Obj),
 			Seed
