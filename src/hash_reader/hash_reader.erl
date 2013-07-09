@@ -1,9 +1,9 @@
 %%
-%% db_hash_reader.erl
+%% hash_reader.erl
 %% Kevin Lynx
 %% 06.28.2013
 %%
--module(db_hash_reader).
+-module(hash_reader).
 -compile(export_all).
 -include("vlog.hrl").
 -behaviour(gen_server).

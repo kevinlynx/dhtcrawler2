@@ -26,6 +26,10 @@ You can also compile the source code and run it manually. The source code is in 
 
 Also you can check more technique information at my blog site (Chinese) [codemacro.com](http://codemacro.com)
 
+## Source code
+
+dhtcrawler is totally open source, and can be used in any purpose, but you should keep my name on, copyright by me please. You can checkout dhtcrawler2 source code in this git repo **src** branch.
+
 ## Config
 
 Most config value is in `priv/dhtcrawler.config`, when you first run dhtcrawler, this file will be generated automatically. And the other config values are passed by arguments to erlang functions. In most case you don't need to change these config values, except these network addresses.

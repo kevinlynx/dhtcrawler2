@@ -115,8 +115,8 @@ inc_announce(Conn, Hash) when is_binary(Hash) ->
 	% damn, mongodb-erlang doesnot support update a field for an object,
 	% `findAndModify` works but it will change `announce' datatype to double
 	Cmd = {findAndModify, ?COLLNAME, query, {'_id', Hash}, 
-		update, {'$inc', {announce, 1}},
-		new, true},
+		update, {'$inc', {announce, 1}}, fields, {},
+		new, false},
 	Ret = mongo_do(Conn, fun() ->
 		mongo:command(Cmd)
 	end),
@@ -277,7 +277,7 @@ test_find_top() ->
 	end).
 
 test_announce() ->
-	Hash = "F79ED3E2BF29A5C4358202E88C9983AB479D7722",
+	Hash = "6605993570A4A74C89FD02355333F3A86BEE6C1F",
 	test_content(fun(Conn) ->
 		inc_announce(Conn, Hash)
 	end).
