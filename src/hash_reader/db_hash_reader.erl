@@ -106,6 +106,7 @@ handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
 		true -> 
 			?T(?FMT("inc_announce success ~s", [ListHash])),
 			on_updated(Conn),
+			if DownloadDoc -> try_next_download(Conn); true -> ok end,
 			State;
 		false ->
 			?T(?FMT("start to download the torrent ~s", [ListHash])),

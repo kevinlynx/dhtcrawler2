@@ -39,7 +39,7 @@ srv_name() ->
 init([File, Fun]) ->
 	FullPath = in_priv_path(File),
 	State = case file:consult(FullPath) of
-		{error, Reason} ->
+		{error, _Reason} ->
 			Config = if Fun == nil -> []; true -> Fun() end,
 			file:write_file(FullPath, io_lib:fwrite("~p.\n",[Config])),
 			Config;
