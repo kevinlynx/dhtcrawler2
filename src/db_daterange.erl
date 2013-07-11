@@ -42,18 +42,19 @@ insert(Conn, Hash) when is_list(Hash) ->
 	gen_server:cast(srv_name(), insert),
 	IRet.
 
-% [ListHash, ListHash]
+% [{ListHash, Req}, {ListHash, Req}]
 lookup(Conn, DaySecs, Count) ->
 	Sel = {'$query', {date, DaySecs}, '$orderby', {reqs, -1}},
 	List = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
-		Cursor = mongo:find(?COLLNAME, Sel, {'_id', 1}, 0, Count), 
+		Cursor = mongo:find(?COLLNAME, Sel, {'_id', 1, reqs, 1}, 0, Count), 
 		mongo_cursor:rest(Cursor)
 	end),
 	[decode_hash(Doc) || Doc <- List].
 
 decode_hash(Doc) ->
 	{ID} = bson:lookup('_id', Doc),
-	binary_to_list(ID).
+	{Req} = bson:lookup(reqs, Doc),
+	{binary_to_list(ID), Req}.
 		
 % delete all oldest hashes 
 try_delete_oldest(Conn) ->

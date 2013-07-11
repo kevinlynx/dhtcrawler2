@@ -91,8 +91,15 @@ search_newest_top(Conn, Count, DaySecs) ->
 % use hash_date to search, based on date index, so the search speed is very fast
 search_newest_top_by_date(Conn, Count, DaySecs) ->
 	Hashes = db_daterange:lookup(Conn, DaySecs, Count),
-	Infos = [index(Conn, Hash) || Hash <- Hashes],
+	Infos = [day_info(Conn, Hash, Req) || {Hash, Req} <- Hashes],
 	lists:filter(fun(E) -> E /= {} end, Infos).
+
+day_info(Conn, Hash, Req) ->
+	case index(Conn, Hash) of
+		{} -> {};
+		Info ->
+			setelement(4, Info, Req)
+	end.
 
 index(Conn, Hash) when is_list(Hash) ->
 	Ret = mongo_do_slave(Conn, fun() ->
@@ -214,6 +221,8 @@ decode_ret_item(Item) ->
 	{Torrent} = bson:lookup(obj, Item),
 	decode_torrent_item(Torrent).
 
+% {single, Hash, {Name, Length}, RequestCount, CreatedAt}
+% {multi, Hash, {Name, Files}, RequestCount, CreatedAt}
 decode_torrent_item(Torrent) ->	
 	{BinHash} = bson:lookup('_id', Torrent),
 	Hash = binary_to_list(BinHash),
