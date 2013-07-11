@@ -1,6 +1,6 @@
 {application,dhtcrawler,
              [{description,"A DHT crawler to index magnet hash to torrent"},
-              {vsn,"24b8061"},
+              {vsn,"9d8c60f"},
               {registered,[dht_crawler_sup]},
               {applications,[kernel,stdlib,crypto,public_key,ssl,inets,bson,
                              mongodb]},
