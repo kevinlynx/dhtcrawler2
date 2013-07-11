@@ -46,9 +46,11 @@ handle_info({got_torrent, failed, _Hash}, State) ->
 	Conn = db_conn(State),
 	try_next_download(Conn),
 	?T(?FMT("got torrent failed ~s", [_Hash])),
+	hash_reader_stats:handle_download_failed(),
 	{noreply, State#state{downloading = D - 1}};
 
 handle_info({got_torrent, ok, Hash, Content}, State) ->
+	hash_reader_stats:handle_download_ok(),
 	Conn = db_conn(State),
 	true = is_binary(Content),
 	% save the torrent file

@@ -17,8 +17,12 @@
 		 handle_update/0,
 		 handle_insert/0,
 		 handle_used_cache/0,
+		 handle_download_ok/0,
+		 handle_download_failed/0,
 		 dump/0]).
--record(state, {tref, count, start, name, cache_used = 0, updated = 0, inserted = 0}).
+-record(state, {tref, count, start, name, cache_used = 0, 
+	updated = 0, inserted = 0,
+	download_ok = 0, download_failed = 0}).
 -define(STATS_INTERVAL, 10*60*1000).
 -define(TEXT(Fmt, Arg), lists:flatten(io_lib:format(Fmt, Arg))).
 
@@ -42,6 +46,12 @@ handle_insert() ->
 
 handle_used_cache() ->
 	gen_server:cast(srv_name(), inc_cache_used).
+
+handle_download_ok() ->
+	gen_server:cast(srv_name(), inc_download_ok).
+
+handle_download_failed() ->
+	gen_server:cast(srv_name(), inc_download_failed).
 
 srv_name() ->
 	?MODULE.
@@ -81,6 +91,14 @@ handle_cast(inc_inserted, State) ->
 handle_cast(inc_cache_used, State) ->
 	#state{cache_used = C} = State,
 	{noreply, State#state{cache_used = C + 1}};
+
+handle_cast(inc_download_ok, State) ->
+	#state{download_ok = D} = State,
+	{noreply, State#state{download_ok = D + 1}};
+
+handle_cast(inc_download_failed, State) ->
+	#state{download_failed = D} = State,
+	{noreply, State#state{download_failed = D + 1}};
 	
 handle_cast(stop, State) ->
 	{stop, normal, State}.
@@ -112,7 +130,9 @@ date_string() ->
     	[Year, Month, Day, Hour, Min, Sec])).
 
 format_stats(State) ->
-	#state{count = C, start = Start, cache_used = Cache, updated = U, inserted = I} = State,
+	#state{count = C, start = Start, cache_used = Cache, 
+		download_ok = DO, download_failed = DF,
+		updated = U, inserted = I} = State,
 	{Day, {H, M, S}} = stats_time(Start),
 	Mins = Day * 24 * 60 + H * 60 + M,
 	TotalMins = if Mins > 0 -> Mins; true -> 1 end,
@@ -124,6 +144,8 @@ format_stats(State) ->
 	?TEXT("  Reader count ~p~n", [C]) ++
 	?TEXT("  Process speed ~p req/min~n", [Speed]) ++
 	?TEXT("  Download torrents speed ~p tor/min~n", [I div TotalMins]) ++
+	?TEXT("  Download success ~p~n", [DO]) ++
+	?TEXT("  Download failed ~p~n", [DF]) ++
 	?TEXT("  Updated ~p~n", [U]) ++
 	?TEXT("  Inserted ~p~n", [I]) ++
 	?TEXT("  Inserted percentage ~.2f%~n", [InsertPercent]) ++
@@ -144,6 +166,4 @@ format_download_stats() ->
 	?TEXT("  Total used time ~p secs~n", [TotalSecs]) ++
 	?TEXT("  Download speed ~p tor/secs~n", [TorSpeed]) ++
 	?TEXT("  Current wait requests ~p~n", [CurrentReqCount]).
-
-
 
