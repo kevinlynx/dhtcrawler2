@@ -21,6 +21,10 @@
 -define(HTTP_SESSION, 5000).
 -define(HTTP_PIPELINE, 1000).
 -define(REQ_TIMEOUT, 60*1000).
+% when ibrowse crashed, it will not notify these requests timeout, that will
+% make these requests stay in the state forever
+-define(REQ_ERROR_TIMEOUT, 2*?REQ_TIMEOUT).
+-define(IS_ERROR_TIMEOUT(T), (timer:now_diff(now(), T) div 1000 > ?REQ_ERROR_TIMEOUT)).
 -record(state, {start, hashSum = 0, reqSum = 0, totalTime = 0, reqs}).
 
 start_global() ->
@@ -48,8 +52,11 @@ init([]) ->
 
 handle_cast({download, MagHash, From}, State) ->
 	#state{reqs = Reqs, hashSum = H, reqSum = R} = State,
-	NewReqs = create_download(Reqs, MagHash, From),
-	{noreply, State#state{reqs = NewReqs, hashSum = H + 1, reqSum = R + 1}};
+	% remove these invalid requests
+	UpdateReqs = Reqs, %check_error_timeout_reqs(Reqs),
+	NewReqs = create_download(UpdateReqs, MagHash, From),
+	NewSum = R + 1 - gb_trees:size(Reqs) - gb_trees:size(UpdateReqs),
+	{noreply, State#state{reqs = NewReqs, hashSum = H + 1, reqSum = NewSum}};
 
 handle_cast(stop, State) ->
     {stop, normal, State};
@@ -65,11 +72,11 @@ code_change(_, _, State) ->
 
 handle_response(State, ReqID, Body) ->
 	#state{reqSum = R, totalTime = T, reqs = Reqs} = State,
-	{MagHash, URLs, From, Start} = gb_trees:get(ReqID, Reqs),
-	NewT = T + timer:now_diff(now(), Start) div 1000, % mill-seconds
+	{MagHash, URLs, From, ThisStart, Start} = gb_trees:get(ReqID, Reqs),
+	NewT = T + timer:now_diff(now(), ThisStart) div 1000, % mill-seconds
 	{NewReqS, NewReqs} = case unzip_content(Body) of
 		error ->
-			handle_next_req(MagHash, URLs, From, R, ReqID, Reqs);
+			handle_next_req(MagHash, URLs, From, R, Start, ReqID, Reqs);
 		Content ->
 			{R, handle_ok_response(MagHash, Content, From, ReqID, Reqs)}
 	end,
@@ -86,6 +93,11 @@ handle_info({ibrowse_async_response, ReqID, Body}, State) ->
 	end,
 	{noreply, NewState};
 
+handle_info(check_error_timeout, State) ->
+	#state{reqs = Reqs} = State,
+	NewReqs = check_error_timeout_reqs(Reqs),
+	{noreply, State#state{reqs = NewReqs}};
+	
 handle_info(_, State) ->
     {noreply, State}.
 
@@ -96,14 +108,15 @@ handle_call(get_stats, _From, State) ->
 handle_call(_, _From, State) ->
 	{noreply, State}.
 %%
-handle_next_req(MagHash, URLs, From, ReqSum, ReqID, Reqs) ->
+handle_next_req(MagHash, URLs, From, ReqSum, Start, ReqID, Reqs) ->
 	DelReqs = gb_trees:delete(ReqID, Reqs),
 	case request_next(URLs) of
 		{error, empty} ->
 			From ! {got_torrent, failed, MagHash},
 			{ReqSum, DelReqs};
 		{ok, NewReqID, NewURLs, Time} ->
-			NewReq = {MagHash, NewURLs, From, Time},
+			% REQUEST, record the original download request start time
+			NewReq = {MagHash, NewURLs, From, Time, Start},
 			{ReqSum + 1, gb_trees:insert(NewReqID, NewReq, DelReqs)}
 	end.
 
@@ -115,7 +128,8 @@ create_download(Reqs, MagHash, From) ->
 	URLs = create_req_urls(MagHash),
 	case request_next(URLs) of 
 		{ok, ReqID, NewURLs, Time} ->
-			Req = {MagHash, NewURLs, From, Time},
+			% REQUEST
+			Req = {MagHash, NewURLs, From, Time, Time},
 			gb_trees:insert(ReqID, Req, Reqs);
 		{error, empty} -> % exception
 			From ! {got_torrent, failed, MagHash},
@@ -153,14 +167,16 @@ unzip_content(_B) ->
 get_req_hosts() ->
 	["http://bt.box.n0808.com", 
    	"http://torcache.net",
+   	"http:/torrange.com",
    	"http://zoink.it"].
 
 create_req_urls(MagHash) when is_list(MagHash), length(MagHash) == 40 ->
 	U1 = "http://torcache.net/torrent/" ++ MagHash ++ ".torrent",
 	U2 = format_btbox_url(MagHash),
+	U3 = "http://torrage.com/torrent/" ++ MagHash ++ ".torrent",
 	% zoink.it support https, but the ssl library seems memory leak
-	U3 = "http://zoink.it/torrent/" ++ MagHash ++ ".torrent",
-	[U1, U2, U3].	
+	U4 = "http://zoink.it/torrent/" ++ MagHash ++ ".torrent",
+	[U1, U2, U3, U4].	
 
 is_ssl_url(URL) when is_list(URL), length(URL) > 4 ->
 	string:substr(URL, 1, 5) == "https".
@@ -170,6 +186,21 @@ format_btbox_url(MagHash) ->
 	T = lists:nthtail(38, MagHash),
 	"http://bt.box.n0808.com/" ++ H ++ "/" ++ T ++ "/" ++ MagHash ++ ".torrent".
 
+check_error_timeout_reqs(Reqs) ->
+	ReqList = gb_trees:to_list(Reqs),
+	lists:foldl(fun(E, NewReqs) ->
+		check_error_timeout(NewReqs, E)
+	end, gb_trees:empty(), ReqList).
+
+check_error_timeout(Acc, {ReqID, {MagHash, _, From, _, Start} = Req}) ->
+	case ?IS_ERROR_TIMEOUT(Start) of
+		true ->
+			From ! {got_torrent, failed, MagHash},
+			?E(?FMT("download req error timeout ~s", [MagHash])),
+			Acc;
+		false ->
+			gb_trees:insert(ReqID, Req, Acc)
+	end.
 %%
 test(Pid, MagHash) ->
 	tor_download:download(Pid, MagHash),
