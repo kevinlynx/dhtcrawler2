@@ -83,6 +83,14 @@ handle_info({enter_cache, Type, Time, Ret}, State) ->
 handle_info(_, State) ->
 	{noreply, State}.
 
+% for debug purpose
+query(top, State) ->
+	{State, do_update(top)};
+
+% for debug purpose
+query(stats, State) ->
+	{State, do_update(stats)};
+
 query(Type, State) ->
 	#state{cache = Cache} = State,
 	case gb_trees:is_defined(Type, Cache) of

@@ -39,7 +39,7 @@ search_one(MagHash) ->
 find_day_top(_Conn, _DaySecs, 0) ->
 	[];
 find_day_top(Conn, DaySecs, Try) ->
-	case db_store_mongo:search_newest_top(Conn, 50, DaySecs) of
+	case db_store_mongo:search_newest_top_by_date(Conn, 50, DaySecs) of
 		[] ->
 			find_day_top(Conn, DaySecs - ?ONEDAY_SECS, Try - 1);
 		List ->

@@ -10,6 +10,7 @@
 		 start_dep_apps/0,
 		 start_standalone/3,
 		 start_standalone/1]).
+-define(DBPOOLNAME, mongodb_conn_pool_name).
 		 
 start_dep_apps() ->
 	code:add_path("deps/bson/ebin"),
@@ -37,13 +38,14 @@ start_standalone(IP, Port, Size) ->
 	Stats = {hash_reader_stats, {hash_reader_stats, start_link, [Size]}, permanent, 2000, worker, [hash_reader_stats]},
 	DownloadStats = {tor_download_stats, {tor_download_stats, start_link, []}, permanent, 2000, worker, [tor_download_stats]},
 	Log = {vlog, {vlog, start_link, ["log/hash_reader.log", 3]}, permanent, 2000, worker, [vlog]},
-	start_link(IP, Port, Size, [DownloadStats, Stats, Log]).
+	DBDateRange = {db_daterange, {db_daterange, start_link, [?DBPOOLNAME]}, permanent, 1000, worker, [db_daterange]},
+	start_link(IP, Port, Size, [Log, DBDateRange, DownloadStats, Stats]).
 
 start_link(IP, Port, Size) ->
 	start_link(IP, Port, Size, []).
 
 start_link(IP, Port, Size, OtherProcess) ->
-	PoolName = mongodb_conn_pool_name,
+	PoolName = ?DBPOOLNAME,
 	mongo_sup:start_pool(PoolName, 5, {IP, Port}),
 	% ensure index
 	Conn = mongo_pool:get(PoolName),

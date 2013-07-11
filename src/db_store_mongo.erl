@@ -13,6 +13,7 @@
 		 inc_announce/2,
 		 exist/2,
 		 index/2,
+		 search_newest_top_by_date/3,
 		 search_announce_top/2,
 		 search_recently/2,
 		 search_newest_top/3,
@@ -57,6 +58,7 @@ search(Conn, Key) when is_list(Key) ->
 	end),
 	{decode_search(Ret), decode_search_stats(Ret)}.
 
+% deprecated
 search_announce_top(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {announce, -1}},
 	List = mongo_do_slave(Conn, fun() ->
@@ -67,6 +69,7 @@ search_announce_top(Conn, Count) ->
 	end),
 	[decode_torrent_item(Item) || Item <- List].
  
+% deprecated
 % db.hashes.find({$query:{},$orderby:{created_at: 1}}).limit(10);
 search_recently(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {created_at, -1}},
@@ -76,6 +79,7 @@ search_recently(Conn, Count) ->
 	end),
 	[decode_torrent_item(Item) || Item <- List].
 
+% deprecated
 search_newest_top(Conn, Count, DaySecs) ->	
 	Sel = {'$query', {created_at, {'$gt', DaySecs}}, '$orderby', {announce, -1}},
 	List = mongo_do_slave(Conn, fun() ->
@@ -83,6 +87,12 @@ search_newest_top(Conn, Count, DaySecs) ->
 		mongo_cursor:rest(Cursor)
 	end),
 	[decode_torrent_item(Item) || Item <- List].
+
+% use hash_date to search, based on date index, so the search speed is very fast
+search_newest_top_by_date(Conn, Count, DaySecs) ->
+	Hashes = db_daterange:lookup(Conn, DaySecs, Count),
+	Infos = [index(Conn, Hash) || Hash <- Hashes],
+	lists:filter(fun(E) -> E /= {} end, Infos).
 
 index(Conn, Hash) when is_list(Hash) ->
 	Ret = mongo_do_slave(Conn, fun() ->
@@ -95,6 +105,7 @@ index(Conn, Hash) when is_list(Hash) ->
 
 insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
 	NewDoc = create_torrent_desc(Conn, Hash, Name, Length, 1, Files),
+	db_daterange:insert(Conn, Hash),
 	mongo_do(Conn, fun() ->
 		% the doc may already exist because the other process has inserted before
 		Sel = {'_id', list_to_binary(Hash)},
@@ -115,14 +126,16 @@ inc_announce(Conn, Hash) when is_binary(Hash) ->
 	% damn, mongodb-erlang doesnot support update a field for an object,
 	% `findAndModify` works but it will change `announce' datatype to double
 	Cmd = {findAndModify, ?COLLNAME, query, {'_id', Hash}, 
-		update, {'$inc', {announce, 1}}, fields, {},
+		update, {'$inc', {announce, 1}}, fields, {'_id', 1}, % not specifed or {} will return whole object
 		new, false},
 	Ret = mongo_do(Conn, fun() ->
 		mongo:command(Cmd)
 	end),
 	case Ret of
 		{value, undefined, ok, 1.0} -> false;
-		{value, _Obj, lastErrorObject, {updatedExisting, true, n, 1}, ok, 1.0} -> true;
+		{value, _Obj, lastErrorObject, {updatedExisting, true, n, 1}, ok, 1.0} -> 
+			db_daterange:insert(Conn, binary_to_list(Hash)),
+			true;
 		_ -> false
 	end.
 
@@ -287,4 +300,8 @@ test_index(Hash) ->
 		index(Conn, Hash)
 	end).
 
+test_insertdate(Hash) ->
+	test_content(fun(Conn) ->
+		db_daterange:insert(Conn, Hash)
+	end).
 
