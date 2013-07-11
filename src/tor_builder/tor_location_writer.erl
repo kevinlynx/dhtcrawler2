@@ -94,13 +94,15 @@ parse_hash(FileName) ->
 
 append_torrent_names(FP, [Name|Rest]) ->
 	Hash = parse_hash(Name),
-	case length(Hash) == 40 of
+	This = case length(Hash) == 40 of
 		true ->	
-			io:format(FP, "~s~n", [Name]) ,
-			1 + append_torrent_names(FP, Rest);
+			io:format(FP, "~s~n", [Name]),
+			1;
 		false ->
-			?W(?FMT("invalid torrent file name ~s", [Name]))
-	end;
+            ?W(?FMT("invalid torrent file name ~s", [Name])),
+            0
+	end,
+    This + append_torrent_names(FP, Rest);
 
 append_torrent_names(_, []) ->
 	0.
