@@ -32,7 +32,7 @@ init(Host, Port) ->
 init(Conn) ->
 	enable_text_search(Conn),
 	ensure_search_index(Conn),
-	% TODO: numid index ?	
+	ensure_numid_index(Conn),
 	ok.
 
 close(Conn) ->
@@ -152,6 +152,18 @@ ensure_search_index(Conn) ->
 		mongo:ensure_index(?COLLNAME, Spec)
 	end).
 
+-ifdef(SPHINX).
+ensure_numid_index(Conn) ->
+	io:format("sphinx is enabled, ensure numid index for sphinx~n", []),
+	Spec = {key, {numid, 1}},
+	mongo_do(Conn, fun() ->
+		mongo:ensure_index(?COLLNAME, Spec)
+	end).
+-else.
+ensure_numid_index(_Conn) ->
+	io:format("sphinx is disabled, use mongodb text search instead~n", []).
+-endif.
+
 % not work
 enable_text_search(Conn) ->
 	Cmd = {setParameter, 1, textSearchEnabled, true},
@@ -159,7 +171,18 @@ enable_text_search(Conn) ->
 		mongo:command(Cmd)
 	end).
 
+-ifdef(SPHINX).
 create_torrent_desc(Conn, Hash, Name, Length, Announce, Files) ->
+	{'_id', list_to_binary(Hash),
+      % steven told me it's necessary for sphinx, what if the doc already exists ?
+	  numid, db_system:get_torrent_id(Conn), 
+	  name, list_to_binary(Name),
+	  length, Length,
+	  created_at, time_util:now_seconds(),
+	  announce, Announce,
+	  files, encode_file_list(Files)}.
+-else.
+create_torrent_desc(_Conn, Hash, Name, Length, Announce, Files) ->
 	NameArray = case string_split:split(Name) of
 		{error, L, D} ->
 			?E(?FMT("string split failed(error): ~p ~p", [L, D])),
@@ -170,14 +193,13 @@ create_torrent_desc(Conn, Hash, Name, Length, Announce, Files) ->
 		{ok, R} -> R 
 	end,
 	{'_id', list_to_binary(Hash),
-      % steven told me it's necessary for sphinx, what if the doc already exists ?
-	  numid, db_system:get_torrent_id(Conn), 
 	  name, list_to_binary(Name),
 	  name_array, NameArray,
 	  length, Length,
 	  created_at, time_util:now_seconds(),
 	  announce, Announce,
 	  files, encode_file_list(Files)}.
+-endif.
 
 % {file1, {name, xx, length, xx}, file2, {name, xx, length, xx}}
 encode_file_list(Files) ->
@@ -313,4 +335,12 @@ test_insertdate(Hash) ->
 	test_content(fun(Conn) ->
 		db_daterange:insert(Conn, Hash)
 	end).
+
+-ifdef(SPHINX).
+test_compile() ->
+    io:format("sphinx enabled~n", []).
+-else.
+test_compile() ->
+    io:format("sphins disabled~n", []).
+-endif.
 
