@@ -197,14 +197,7 @@ seg_text(Name, Files) ->
 	FullName = lists:foldl(fun({S, _}, Acc) ->
 		Acc ++ " " ++ S
 	end, Name, Files),
-	seg_text(FullName).
-
-seg_text(FullName) ->
-	case config:get(use_rmmseg, false) of
-		false -> list_to_binary(FullName);
-		true ->
-			rmmseg:seg_space(list_to_binary(FullName))
-	end.
+	tor_name_seg:seg_text(FullName).
 -endif.
 
 % {file1, {name, xx, length, xx}, file2, {name, xx, length, xx}}
