@@ -18,6 +18,7 @@
 		 search_recently/2,
 		 search_newest_top/3,
 		 search/2]).
+-export([decode_torrent_item/1]).
 -compile(export_all).
 -define(DBNAME, torrents).
 -define(COLLNAME, hashes).
@@ -183,15 +184,7 @@ create_torrent_desc(Conn, Hash, Name, Length, Announce, Files) ->
 	  files, encode_file_list(Files)}.
 -else.
 create_torrent_desc(_Conn, Hash, Name, Length, Announce, Files) ->
-	NameArray = case string_split:split(Name) of
-		{error, L, D} ->
-			?E(?FMT("string split failed(error): ~p ~p", [L, D])),
-			[Name];
-		{incomplete, L, D} ->
-			?E(?FMT("string split failed(incomplte): ~p ~p", [L, D])),
-			[Name];
-		{ok, R} -> R 
-	end,
+	NameArray = seg_text(Name, Files),
 	{'_id', list_to_binary(Hash),
 	  name, list_to_binary(Name),
 	  name_array, NameArray,
@@ -199,6 +192,19 @@ create_torrent_desc(_Conn, Hash, Name, Length, Announce, Files) ->
 	  created_at, time_util:now_seconds(),
 	  announce, Announce,
 	  files, encode_file_list(Files)}.
+
+seg_text(Name, Files) ->
+	FullName = lists:foldl(fun({S, _}, Acc) ->
+		Acc ++ " " ++ S
+	end, Name, Files),
+	seg_text(FullName).
+
+seg_text(FullName) ->
+	case config:get(use_rmmseg, false) of
+		false -> list_to_binary(FullName);
+		true ->
+			rmmseg:seg_space(list_to_binary(FullName))
+	end.
 -endif.
 
 % {file1, {name, xx, length, xx}, file2, {name, xx, length, xx}}

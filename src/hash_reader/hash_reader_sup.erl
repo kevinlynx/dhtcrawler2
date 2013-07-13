@@ -34,12 +34,21 @@ start_standalone(IP, Port, Size) ->
 	start_dep_apps(),
 	tor_download:start_global(),
 	config:start_link("hash_reader.config", fun() -> config_default() end),
+	init_rmmseg(config:get(use_rmmseg, false)),
 	% NOTE:
 	Stats = {hash_reader_stats, {hash_reader_stats, start_link, [Size]}, permanent, 2000, worker, [hash_reader_stats]},
 	DownloadStats = {tor_download_stats, {tor_download_stats, start_link, []}, permanent, 2000, worker, [tor_download_stats]},
 	Log = {vlog, {vlog, start_link, ["log/hash_reader.log", 3]}, permanent, 2000, worker, [vlog]},
 	DBDateRange = {db_daterange, {db_daterange, start_link, [?DBPOOLNAME]}, permanent, 1000, worker, [db_daterange]},
 	start_link(IP, Port, Size, [Log, DBDateRange, DownloadStats, Stats]).
+
+init_rmmseg(true) ->
+	io:format("rmmseg is enabled~n", []),
+	rmmseg:init(), 
+	rmmseg:load_dicts();
+init_rmmseg(false) ->
+	io:format("rmmseg is disabled~n", []),
+	ok.
 
 start_link(IP, Port, Size) ->
 	start_link(IP, Port, Size, []).
@@ -72,4 +81,5 @@ config_default() ->
 	 {save_to_db, false},
 	 {save_to_file, true},
 	 {load_from_db, false},
+	 {use_rmmseg, false},
 	 {torrent_path, "torrents/"}].
