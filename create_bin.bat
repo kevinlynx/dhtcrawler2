@@ -16,4 +16,5 @@ copy ebin\*.* bin\ebin\
 mkdir bin\tools
 mkdir bin\tools\db-replset
 copy tools\db-replset\*.* bin\tools\db-replset\
+copy priv\*.dic bin\priv\
 pause
