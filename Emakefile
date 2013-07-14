@@ -34,3 +34,7 @@
     [debug_info,   
 		{i, "include"},
     	{outdir,"ebin"}]}.
+{'src/cache_indexer/*',
+    [debug_info,   
+		{i, "include"},
+    	{outdir,"ebin"}]}.
