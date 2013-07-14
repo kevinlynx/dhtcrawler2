@@ -193,11 +193,10 @@ create_torrent_desc(_Conn, Hash, Name, Length, Announce, Files) ->
 	  announce, Announce,
 	  files, encode_file_list(Files)}.
 
-seg_text(Name, Files) ->
-	FullName = lists:foldl(fun({S, _}, Acc) ->
-		Acc ++ " " ++ S
-	end, Name, Files),
-	tor_name_seg:seg_text(FullName).
+seg_text(Name, _Files) ->
+	%FullName = lists:foldl(fun({S, _}, Acc) -> Acc ++ " " ++ S end, Name, Files),
+	%tor_name_seg:seg_text(FullName).
+	tor_name_seg:seg_text(Name).
 -endif.
 
 % {file1, {name, xx, length, xx}, file2, {name, xx, length, xx}}
