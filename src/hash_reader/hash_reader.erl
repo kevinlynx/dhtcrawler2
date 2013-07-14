@@ -205,28 +205,23 @@ insert_to_download_wait(Conn, Doc) ->
 	end).
 
 try_next_download(Conn) ->
-	Doc = mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
-		D = mongo:find_one(?HASH_DOWNLOAD_COLL, {}),
-		delete_inner_doc(?HASH_DOWNLOAD_COLL, D),
-		D
-	end),
+	Doc = load_delete_next(Conn, ?HASH_DOWNLOAD_COLL),
 	schedule_next(Doc, true).
 
 % if there's no hash, try `wait_download' 
 try_next(Conn) ->
-	Doc = mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
-		D = mongo:find_one(?HASH_COLLNAME, {}),
-		delete_inner_doc(?HASH_COLLNAME, D),
-		D
-	end),
+	Doc = load_delete_next(Conn, ?HASH_COLLNAME),
 	schedule_next(Doc, false).
 
-delete_inner_doc(_Col, {}) ->
-	ok;
-
-delete_inner_doc(Col, {Doc}) ->
-	{ID} = bson:lookup('_id', Doc),
-	mongo:delete(Col, {'_id', ID}).
+load_delete_next(Conn, Col) ->
+	Cmd = {findAndModify, Col, fields, {}, remove, true},
+	Ret = mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
+		mongo:command(Cmd)
+	end),
+	case Ret of
+		{value, undefined, ok, 1.0} -> {};
+		{value, Obj, lastErrorObject, _, ok, 1.0} -> {Obj}
+	end.
 
 schedule_next({}, true) ->
 	ok;
