@@ -84,8 +84,8 @@ handle_info(_, State) ->
 	{noreply, State}.
 
 % for debug purpose
-query(top, State) ->
-	{State, do_update(top)};
+%query(top, State) ->
+%	{State, do_update(top)};
 
 % for debug purpose
 query(stats, State) ->
@@ -133,6 +133,7 @@ do_query(Type, #state{cache = Cache} = State) ->
 			% update the time so that it will not be scheduled more time
 			gb_trees:enter(Type, {now(), Ret}, Cache);
 		false ->
+			io:format("response cache to ~p~n", [Type]),
 			Cache
 	end,
 	{State#state{cache = NewCache}, Ret}.
