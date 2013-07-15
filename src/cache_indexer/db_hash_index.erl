@@ -22,8 +22,8 @@ do_insert(Conn, Hash) ->
 
 exist(Conn, Hash) when is_list(Hash) ->
 	Sel = {'_id', list_to_binary(Hash)},
-	{Doc} = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
+	Doc = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
 		mongo:find_one(?COLLNAME, Sel)
 	end),
-	Doc == {}.
+	Doc /= {}.
 

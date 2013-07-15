@@ -19,9 +19,10 @@
 		 handle_used_cache/0,
 		 handle_download_ok/0,
 		 handle_download_failed/0,
+		 handle_cache_filtered/0,
 		 dump/0]).
 -record(state, {tref, count, start, name, cache_used = 0, 
-	updated = 0, inserted = 0,
+	updated = 0, inserted = 0, cache_filtered = 0,
 	download_ok = 0, download_failed = 0}).
 -define(STATS_INTERVAL, 10*60*1000).
 -define(TEXT(Fmt, Arg), lists:flatten(io_lib:format(Fmt, Arg))).
@@ -52,6 +53,9 @@ handle_download_ok() ->
 
 handle_download_failed() ->
 	gen_server:cast(srv_name(), inc_download_failed).
+
+handle_cache_filtered() ->
+	gen_server:cast(srv_name(), inc_cache_filtered).
 
 srv_name() ->
 	?MODULE.
@@ -99,6 +103,10 @@ handle_cast(inc_download_ok, State) ->
 handle_cast(inc_download_failed, State) ->
 	#state{download_failed = D} = State,
 	{noreply, State#state{download_failed = D + 1}};
+
+handle_cast(inc_cache_filtered, State) ->
+	#state{cache_filtered = D} = State,
+	{noreply, State#state{cache_filtered = D + 1}};
 	
 handle_cast(stop, State) ->
 	{stop, normal, State}.
@@ -131,6 +139,7 @@ date_string() ->
 
 format_stats(State) ->
 	#state{count = C, start = Start, cache_used = Cache, 
+		cache_filtered = CacheFiltered, 
 		download_ok = DO, download_failed = DF,
 		updated = U, inserted = I} = State,
 	{Day, {H, M, S}} = stats_time(Start),
@@ -146,6 +155,7 @@ format_stats(State) ->
 	?TEXT("  Download torrents speed ~p tor/min~n", [I div TotalMins]) ++
 	?TEXT("  Download success ~p~n", [DO]) ++
 	?TEXT("  Download failed ~p~n", [DF]) ++
+	?TEXT("  Cache Index Filtered ~p~n", [CacheFiltered]) ++
 	?TEXT("  Updated ~p~n", [U]) ++
 	?TEXT("  Inserted ~p~n", [I]) ++
 	?TEXT("  Inserted percentage ~.2f%~n", [InsertPercent]) ++

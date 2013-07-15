@@ -41,6 +41,11 @@ terminate(_, State) ->
 code_change(_, _, State) ->
     {ok, State}.
 
+handle_info(filter_torrent, State) ->
+	Conn = db_conn(State),
+	try_next_download(Conn),
+	{noreply, State};
+
 handle_info({got_torrent, failed, _Hash}, State) ->
 	#state{downloading = D} = State,
 	Conn = db_conn(State),
@@ -87,7 +92,7 @@ handle_info(process_download_hash, State) ->
 			try_next_download(Conn),
 			% until the max downloader count reaches
 			timer:send_after(?DOWNLOAD_INTERVAL, process_download_hash),
-			D + 1
+			D % + 1, bug here ?
 	end,
 	{noreply, State#state{downloading = NewD}};
 
@@ -206,7 +211,28 @@ insert_to_download_wait(Conn, Doc) ->
 
 try_next_download(Conn) ->
 	Doc = load_delete_next(Conn, ?HASH_DOWNLOAD_COLL),
-	schedule_next(Doc, true).
+	check_in_index_cache(Conn, Doc).
+
+check_in_index_cache(_, {}) ->
+	ok;
+check_in_index_cache(Conn, {Doc}) ->
+	{Hash} = bson:lookup(hash, Doc),
+	ListHash = binary_to_list(Hash),
+	Try = should_try_download(config:get(check_cache, false), Conn, ListHash),
+	case Try of
+		true ->
+			schedule_next({Doc}, true);
+		false -> 
+			% not in the local cache index, which means it may not exist on the server
+			% so give it up
+			hash_reader_stats:handle_cache_filtered(),
+			self() ! filter_torrent
+	end.
+
+should_try_download(true, Conn, Hash) ->
+	db_hash_index:exist(Conn, Hash);
+should_try_download(false, _, _) ->
+	true.
 
 % if there's no hash, try `wait_download' 
 try_next(Conn) ->
