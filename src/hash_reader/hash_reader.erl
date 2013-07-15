@@ -89,9 +89,13 @@ handle_info(process_download_hash, State) ->
 			?T(?FMT("start a new download ~p", [D])),
 			% launch downloader
 			Conn = db_conn(State),
-			try_next_download(Conn),
-			% until the max downloader count reaches
-			timer:send_after(?DOWNLOAD_INTERVAL, process_download_hash),
+			case try_next_download(Conn) of
+				ok ->
+					% until the max downloader count reaches
+					timer:send_after(?DOWNLOAD_INTERVAL, process_download_hash);
+				empty ->
+					skip
+			end,
 			D % + 1, bug here ?
 	end,
 	{noreply, State#state{downloading = NewD}};
@@ -214,7 +218,7 @@ try_next_download(Conn) ->
 	check_in_index_cache(Conn, Doc).
 
 check_in_index_cache(_, {}) ->
-	ok;
+	empty;
 check_in_index_cache(Conn, {Doc}) ->
 	{Hash} = bson:lookup(hash, Doc),
 	ListHash = binary_to_list(Hash),
@@ -227,7 +231,8 @@ check_in_index_cache(Conn, {Doc}) ->
 			% so give it up
 			hash_reader_stats:handle_cache_filtered(),
 			self() ! filter_torrent
-	end.
+	end,
+	ok.
 
 should_try_download(true, Conn, Hash) ->
 	db_hash_index:exist(Conn, Hash);
