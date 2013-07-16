@@ -53,6 +53,7 @@ srv_name() ->
 init([DBIP, DBPort]) ->
 	mongo_sup:start_pool(?DBPOOL, 5, {DBIP, DBPort}),
 	filelib:ensure_dir("log/"),
+	filelib:ensure_dir(?WORKDIR),
 	vlog:start_link("log/hash_cache.txt", 0),
 	{Done, WorkOn} = load_status(?WORKDIR),
 	?I(?FMT("done ~p, workon ~p", [Done, WorkOn])),
@@ -70,25 +71,29 @@ code_change(_, _, State) ->
     {ok, State}.
 
 handle_info(sync_today, State) ->
-	#state{work_on = WorkOn} = State,
-	FileName = index_download:today_file_name(),
-	case lists:member(FileName, WorkOn) of
-		true ->
-			% the file is processing, we should wait
-			?I(?FMT("today index file ~s is processing, wait", [FileName])),
-			schedule_update_today();
-		false ->
-			?I(?FMT("start to download today index file ~s", [FileName])),
-			index_download:download()
-	end,
+	{TodayDate, _} = calendar:local_time(),
+	index_download:download(self(), TodayDate),
+	NowSecs = time_util:now_seconds(),
+	% download yesterday file, to avoid time difference between server and local
+	{Yesterday, _} = time_util:seconds_to_local_time(NowSecs - 24*60*60),
+	index_download:download(self(), Yesterday),
 	{noreply, State};
 
-handle_info({sync_torrent_index, ok, FileName}, State) ->
+handle_info({sync_torrent_index, ok, FileName, Content}, State) ->
 	#state{workers = Workers, work_on = WorkOn} = State,
+	FullName = ?WORKDIR ++ FileName,
+	{NewWorkOn, NewWorkers} = case lists:member(FullName, WorkOn) of
+		true ->
+			% the file is processing, we can't write that file because it's read-only
+			?I(?FMT("the file ~s is processing, give up the download content", [FullName])),
+			{WorkOn, Workers};
+		false ->
+			file:write_file(FullName, Content),
+			Pid = start_worker(FullName),
+			{[FullName|WorkOn], [Pid|Workers]}
+	end,
 	schedule_update_today(),
-	?I(?FMT("today index file ~s download success", [FileName])),
-	Pid = start_worker(FileName),
-	{noreply, State#state{work_on = [FileName|WorkOn], workers = [Pid|Workers]}};
+	{noreply, State#state{work_on = NewWorkOn, workers = NewWorkers}};
 
 handle_info({sync_torrent_index, failed, FileName}, State) ->
 	?W(?FMT("today index file ~s download failed", [FileName])),
@@ -114,7 +119,7 @@ handle_info({worker_done, Pid, FileName}, State) ->
 handle_info(timeout, State) ->
 	#state{work_on = WorkOn} = State,
 	Workers = [start_worker(FileName) || FileName <- WorkOn],
-	schedule_update_today(),
+	self() ! sync_today,
 	{noreply, State#state{workers = Workers}}.
 
 handle_cast(stop, State) ->

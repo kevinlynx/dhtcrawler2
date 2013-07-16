@@ -52,10 +52,11 @@ exist(Conn, Hash) when is_list(Hash) ->
 
 % {Rets, {Found, CostTime}}
 search(Conn, Key) when is_list(Key) ->
+	StripKey = string:strip(Key),
 	BinColl = list_to_binary(atom_to_list(?COLLNAME)),
-	BinKey = list_to_binary(Key),
+	BinKey = list_to_binary(StripKey),
 	Ret = mongo_do_slave(Conn, fun() ->
-		mongo:command({text, BinColl, search, BinKey})
+		mongo:command({text, BinColl, search, BinKey, limit, 50})
 	end),
 	{decode_search(Ret), decode_search_stats(Ret)}.
 

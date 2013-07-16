@@ -7,6 +7,8 @@
 -export([now_seconds/0, 
 		 diff_milsecs/2,
 		 seconds_to_local_time/1,
+		 local_time_to_universal_time/1,
+		 now_utc_time/0,
 		 now_day_seconds/0]).
 -compile(export_all).
 
@@ -34,3 +36,5 @@ local_time_to_universal_time(Datetime) ->
 			DateTimeUTC
 	end.
 
+now_utc_time() ->
+	local_time_to_universal_time(calendar:local_time()).

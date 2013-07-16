@@ -259,8 +259,7 @@ schedule_next({}, true) ->
 
 schedule_next({}, false) ->
 	?T("hash is empty, try to startup downloader"),
-	self() ! process_download_hash,
-	timer:send_after(?WAIT_TIME, timeout);
+	self() ! process_download_hash;
 
 schedule_next({Doc}, DownloadDoc) ->
 	gen_server:cast(self(), {process_hash, Doc, DownloadDoc}).

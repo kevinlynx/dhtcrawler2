@@ -152,7 +152,7 @@ format_stats(State) ->
 		[Day, H, M, S]) ++
 	?TEXT("  Reader count ~p~n", [C]) ++
 	?TEXT("  Process speed ~p req/min~n", [Speed]) ++
-	?TEXT("  Download torrents speed ~p tor/min~n", [I div TotalMins]) ++
+	?TEXT("  Insert new speed ~p tor/min~n", [I div TotalMins]) ++
 	?TEXT("  Download success ~p~n", [DO]) ++
 	?TEXT("  Download failed ~p~n", [DF]) ++
 	?TEXT("  Cache Index Filtered ~p~n", [CacheFiltered]) ++
@@ -166,7 +166,7 @@ format_download_stats() ->
 	{ProcessCount, HashSum, ReqSum, TotalTime, CurrentReqCount} = 
 		tor_download_stats:stats(),
 	TotalSecs = TotalTime div 1000,
-	TorSpeed = if HashSum > 0 -> TotalSecs div HashSum; true -> 0 end,
+	ReqSpeed = if ReqSum > 0 -> TotalSecs div ReqSum; true -> 0 end,
 	Used = timer:now_diff(now(), Start) div 1000,
 	?TEXT("  ==== Torrent download stats ====~n", []) ++
 	?TEXT("  Stats used time ~p ms~n", [Used]) ++
@@ -174,6 +174,6 @@ format_download_stats() ->
 	?TEXT("  Request torrents ~p~n", [HashSum]) ++
 	?TEXT("  Http requests ~p~n", [ReqSum]) ++
 	?TEXT("  Total used time ~p secs~n", [TotalSecs]) ++
-	?TEXT("  Download speed ~p tor/secs~n", [TorSpeed]) ++
+	?TEXT("  Request speed ~p req/secs~n", [ReqSpeed]) ++
 	?TEXT("  Current wait requests ~p~n", [CurrentReqCount]).
 
