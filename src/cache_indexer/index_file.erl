@@ -42,7 +42,9 @@ worker_run(Parent, Conn, FileName) ->
 
 process_hash(Conn, FileName, FP, PrintPos, MaxPos, CheckStep) ->
 	case io:get_line(FP, "") of
-		eof -> 0;
+		eof -> 
+			check_progress(FileName, MaxPos, 0, MaxPos, CheckStep),
+			0;
 		Line ->
 			save_hash(Conn, strip_lf(Line)),
 			{ok, Pos} = file:position(FP, cur),
