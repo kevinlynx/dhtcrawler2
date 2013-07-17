@@ -6,47 +6,28 @@
 -module(crawler_app).
 -behaviour(application).
 -export([start/2, stop/1]).
--export([start/0, startboth/0, stop/0]).
+-export([start/0, stop/0]).
 
+% application behaviour callback
 start(_Type, _StartArgs) ->
-	File = config_file_name(),
-	io:format("load config file ~s ", [File]),
-	case file:consult(File) of
-		{error, _Reason} ->
-			do_default_start(File);
-		{ok, [Cfg]} ->
-			do_start(Cfg)
-	end.
+	config:start_link("dhtcrawler.config", fun() -> config_default() end),
+	do_start().
 
 stop(_State) ->
+	config:stop(),
 	crawler_sup:stop().
 
-config_file_name() ->
-	filename:join([filename:dirname(code:which(?MODULE)), 
-		"..", "priv", "dhtcrawler.config"]).
-
-do_default_start(File) ->
-	List = [{start_port, 6776},
-		{node_count, 50},
-		{hash_max_cache, 10},
-		{loglevel, 3},
-		{dbconn, 15},
-		{dbhost, "localhost"},
-		{dbport, 27017}],
-	filelib:ensure_dir("priv/"),
-	file:write_file(File, io_lib:fwrite("~p.\n",[List])),
-	do_start(List).
-
-do_start(List) ->
-	StartPort = proplists:get_value(start_port, List),
-	Count = proplists:get_value(node_count, List),
-	LogLevel = proplists:get_value(loglevel, List),
-	DBConn = proplists:get_value(dbconn, List),
-	DBHost = proplists:get_value(dbhost, List),
-	DBPort = proplists:get_value(dbport, List),
-	HashMaxCache = proplists:get_value(hash_max_cache, List),
+do_start() ->
+	StartPort = config:get(start_port),
+	Count = config:get(node_count),
+	LogLevel = config:get(loglevel),
+	DBConn = config:get(dbconn),
+	DBHost = config:get(dbhost),
+	DBPort = config:get(dbport),
+	CacheMaxCount = config:get(hash_max_cache),
+	CacheMaxTime = config:get(cache_max_time),
 	io:format("dhtcrawler startup ~p, ~p, ~p:~p~n", [StartPort, Count, DBHost, DBPort]),
-	crawler_sup:start_link({StartPort, Count, DBHost, DBPort, LogLevel, DBConn, HashMaxCache}).
+	crawler_sup:start_link({StartPort, Count, DBHost, DBPort, LogLevel, DBConn, CacheMaxTime, CacheMaxCount}).
 
 start() ->
 	error_logger:logfile({open, "crash.log"}),
@@ -60,7 +41,13 @@ start() ->
 stop() ->
 	application:stop(dhtcrawler).
 
-startboth() ->
-    start(),
-    crawler_http:start().
+config_default() ->
+	[{start_port, 6776},
+	 {node_count, 50},
+	 {hash_max_cache, 300},
+	 {cache_max_time, 2*60}, % seconds
+	 {loglevel, 3},
+	 {dbconn, 5},
+	 {dbhost, "localhost"},
+	 {dbport, 27017}].
 

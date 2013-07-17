@@ -89,7 +89,10 @@ stats_get_peers(Conn) ->
 % all queries, not processed
 stats_query_inserted(Conn, Count) ->
 	stats_inc_field(Conn, get_peers_query, Count).
-	
+
+stats_cache_query_inserted(Conn, Count) ->
+	stats_inc_field(Conn, inserted_query, Count).
+
 stats_inc_field(Conn, Filed) ->
 	stats_inc_field(Conn, Filed, 1).
 
@@ -116,6 +119,7 @@ stats_ensure_today(TodaySecs) ->
 	case mongo:find_one(?STATS_COLLNAME, {'_id', TodaySecs}) of
 		{} ->
 			NewDoc = {'_id', TodaySecs, get_peers, 0, get_peers_query, 0,
+				inserted_query, 0, % because has_cache_writer will merge some queries
 				updated, 0, new_saved, 0},
 			mongo:insert(?STATS_COLLNAME, NewDoc),
 			NewDoc;
@@ -128,5 +132,3 @@ test_torrent_id() ->
 	{ok, Conn} = mongo_connection:start_link({localhost, 27017}),
 	ID = get_torrent_id(Conn),
 	ID.
-
-
