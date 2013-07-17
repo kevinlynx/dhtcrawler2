@@ -4,6 +4,7 @@
 %% 07.14.2013
 %%
 -module(index_download).
+-include("vlog.hrl").
 -export([download/0, download/2, do_download/2]).
 -define(DOMAIN, "http://torrage.com").
 
@@ -19,9 +20,14 @@ do_download(From, {_, _, _} = Date) ->
 	URL = format_file_url(?DOMAIN, File),
 	io:format("download file ~s~n", [URL]),
 	Start = now(),
-	{ok, Code, _, Body} = ibrowse:send_req(URL, [], get, [], [], infinity),
-	Ret = check_result(File, Code, Body, timer:now_diff(now(), Start) div 1000),
-	From ! Ret.
+	case ibrowse:send_req(URL, [], get, [], [], infinity) of
+		{ok, Code, _, Body} ->
+			Ret = check_result(File, Code, Body, timer:now_diff(now(), Start) div 1000),
+			From ! Ret;
+		{error, Reason} ->
+			?E(?FMT("download sync file ~s failed ~p", [URL, Reason])),
+			From ! {sync_torrent_index, failed, File}
+	end.
 
 check_result(File, "200", Body, Time) ->
 	Size = length(Body),
