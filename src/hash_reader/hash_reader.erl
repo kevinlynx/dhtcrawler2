@@ -218,6 +218,7 @@ try_next_download(Conn) ->
 	check_in_index_cache(Conn, Doc).
 
 check_in_index_cache(_, {}) ->
+	timer:send_after(?WAIT_TIME, timeout),
 	empty;
 check_in_index_cache(Conn, {Doc}) ->
 	{Hash} = bson:lookup(hash, Doc),
