@@ -18,6 +18,7 @@
 -record(state, {cache_time, cache_max}).
 -define(TBLNAME, hash_table).
 -define(DBPOOL, hash_write_db).
+-define(BATCH_INSERT, 100).
 
 start_link(IP, Port, DBConn, MaxTime, MaxCnt) ->
 	gen_server:start_link({local, srv_name()}, ?MODULE, [IP, Port, DBConn, MaxTime, MaxCnt], []).
@@ -107,13 +108,20 @@ to_docs(Key, ReqAt) ->
 
 do_save(Conn, Docs, ReqSum) ->
 	?T(?FMT("send ~p hashes req-count ~p to db", [length(Docs), ReqSum])),
+	save_hashes(Conn, Docs, 1),
+	db_system:stats_cache_query_inserted(Conn, length(Docs)),
+	db_system:stats_query_inserted(Conn, ReqSum).
+
+save_hashes(Conn, Docs, Pos) when Pos < length(Docs) ->
+	SubDocs = lists:sublist(Docs, Pos, ?BATCH_INSERT),
 	% `safe' may cause this process message queue increasing, but `unsafe' may cause the 
 	% database crashes.
 	mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
-		mongo:insert(?HASH_COLLNAME, Docs)
+		mongo:insert(?HASH_COLLNAME, SubDocs)
 	end),
-	db_system:stats_cache_query_inserted(Conn, length(Docs)),
-	db_system:stats_query_inserted(Conn, ReqSum).
+	save_hashes(Conn, Docs, Pos + ?BATCH_INSERT);
+save_hashes(_, _, _) ->
+	ok.
 
 get_req_cnt(Hash) ->
 	case ets:lookup(?TBLNAME, Hash) of
