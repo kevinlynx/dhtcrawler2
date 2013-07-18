@@ -19,9 +19,8 @@
 -include("db_common.hrl").
 % if there's no hash, wait some time
 -define(WAIT_TIME, 1*60*1000).
-% the max concurrent download tasks
--define(MAX_DOWNLOAD, 50).
 -define(DOWNLOAD_INTERVAL, 100).
+-define(DEF_MAX_DOWNLOAD, 50).
 
 start_link(DBPool) ->
 	gen_server:start_link(?MODULE, [DBPool], []).
@@ -79,7 +78,8 @@ handle_info(timeout, State) ->
 % when there's no hash to process
 handle_info(process_download_hash, State) ->
 	#state{downloading = D} = State,
-	NewD = case D >= ?MAX_DOWNLOAD of
+	MaxD = config:get(max_download_per_reader, ?DEF_MAX_DOWNLOAD),
+	NewD = case D >= MaxD of
 		true ->
 			% the only thing we can do is just wait
 			timer:send_after(?WAIT_TIME, timeout),
@@ -140,7 +140,8 @@ get_req_cnt(Doc) ->
 
 try_download(State, Hash, Doc) ->
 	#state{downloading = D} = State,
-	NewDownloading = case D >= ?MAX_DOWNLOAD of
+	MaxD = config:get(max_download_per_reader, ?DEF_MAX_DOWNLOAD),
+	NewDownloading = case D >= MaxD of
 		true -> % put it into the download queue
 			?T(?FMT("reach the max download, insert it to wait queue ~s", [Hash])),
 			Conn = db_conn(State),

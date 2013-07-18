@@ -75,4 +75,5 @@ config_default() ->
 	 {load_from_db, false},
 	 {text_seg, simple},
 	 {check_cache, false},
+	 {max_download_per_reader, 100},
 	 {torrent_path, "torrents/"}].
