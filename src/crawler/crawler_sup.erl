@@ -21,20 +21,15 @@ stop() ->
 srv_name() ->
 	dht_crawler_sup.
 
-init([{StartPort, Count, DBHost, DBPort, LogLevel, DBConn, HashCacheMax}]) ->
+init([{StartPort, Count, DBHost, DBPort, LogLevel, DBConn, CacheTime, HashCacheMax}]) ->
 	Spec = {one_for_one, 1, 600},
 	Instances = create_dht_instance(StartPort, Count),
 	Logger = [{dht_logger, {vlog, start_link, ["dht_crawler.txt", LogLevel]},
 					permanent, 2000, worker, dynamic}],
-	%Downloader = [{torrent_downloader, {torrent_download, start_link, []},
-	%				permanent, 2000, worker, dynamic}],
-	%DBStorer = [{torrent_index, {torrent_index, start_link, [DBHost, DBPort, crawler_stats, DBConn]},
-	%				permanent, 2000, worker, dynamic}],
-	HashInserter = [{db_hash, {db_hash, start_link, [DBHost, DBPort, DBConn, HashCacheMax]},
+	HashInserter = [{hash_cache_writer, {hash_cache_writer, start_link, [DBHost, DBPort, DBConn, CacheTime, HashCacheMax]},
 					permanent, 2000, worker, dynamic}],
 	Stats = [{crawler_stats, {crawler_stats, start_link, []},
 					permanent, 2000, worker, dynamic}],
-	%Children = Logger ++ Downloader ++ DBStorer ++ Instances,
 	Children = Logger ++ HashInserter ++ Stats ++ Instances,
     {ok, {Spec, Children}}.
 

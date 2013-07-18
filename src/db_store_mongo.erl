@@ -11,6 +11,7 @@
 		 unsafe_insert/2,
 		 count/1,
 		 inc_announce/2,
+		 inc_announce/3,
 		 exist/2,
 		 index/2,
 		 search_newest_top_by_date/3,
@@ -114,7 +115,8 @@ index(Conn, Hash) when is_list(Hash) ->
 
 insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
 	NewDoc = create_torrent_desc(Conn, Hash, Name, Length, 1, Files),
-	db_daterange:insert(Conn, Hash),
+	% TODO: because of the hash_cache_writer, the new inserted torrent lost the req_cnt value
+	db_daterange:insert(Conn, Hash, 1),
 	mongo_do(Conn, fun() ->
 		% the doc may already exist because the other process has inserted before
 		Sel = {'_id', list_to_binary(Hash)},
@@ -129,13 +131,14 @@ unsafe_insert(Conn, Tors) when is_list(Tors) ->
 	end).
 
 inc_announce(Conn, Hash) when is_list(Hash) ->
-	inc_announce(Conn, list_to_binary(Hash));
-	
-inc_announce(Conn, Hash) when is_binary(Hash) ->
+	inc_announce(Conn, Hash, 1).
+
+inc_announce(Conn, Hash, Inc) when is_list(Hash) ->
 	% damn, mongodb-erlang doesnot support update a field for an object,
 	% `findAndModify` works but it will change `announce' datatype to double
-	Cmd = {findAndModify, ?COLLNAME, query, {'_id', Hash}, 
-		update, {'$inc', {announce, 1}}, fields, {'_id', 1}, % not specifed or {} will return whole object
+	BHash = list_to_binary(Hash),
+	Cmd = {findAndModify, ?COLLNAME, query, {'_id', BHash}, 
+		update, {'$inc', {announce, Inc}}, fields, {'_id', 1}, % not specifed or {} will return whole object
 		new, false},
 	Ret = mongo_do(Conn, fun() ->
 		mongo:command(Cmd)
@@ -143,7 +146,7 @@ inc_announce(Conn, Hash) when is_binary(Hash) ->
 	case Ret of
 		{value, undefined, ok, 1.0} -> false;
 		{value, _Obj, lastErrorObject, {updatedExisting, true, n, 1}, ok, 1.0} -> 
-			db_daterange:insert(Conn, binary_to_list(Hash)),
+			db_daterange:insert(Conn, Hash, Inc),
 			true;
 		_ -> false
 	end.

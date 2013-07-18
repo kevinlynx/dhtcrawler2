@@ -107,13 +107,14 @@ handle_info(M, State) ->
 handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
 	Conn = db_conn(State),
 	{Hash} = bson:lookup(hash, Doc),
+	ReqCnt = get_req_cnt(Doc), 
 	ListHash = binary_to_list(Hash),
 	?T(?FMT("process a hash ~s download-doc ~p", [ListHash, DownloadDoc])),
 	% to avoid register many timers when the hash is empty but download hash is not
 	% it also can avoid increase the message queue size, everytime this function get called,
 	% it remove this message and append only another 1.
 	if DownloadDoc -> do_nothing; true -> try_next(Conn) end,
-	NewState = case db_store_mongo:inc_announce(Conn, ListHash) of
+	NewState = case db_store_mongo:inc_announce(Conn, ListHash, ReqCnt) of
 		true -> 
 			?T(?FMT("inc_announce success ~s", [ListHash])),
 			on_updated(Conn),
@@ -130,6 +131,12 @@ handle_cast(stop, State) ->
 
 handle_call(_, _From, State) ->
 	{noreply, State}.
+
+get_req_cnt(Doc) ->
+	case bson:lookup(req_cnt, Doc) of
+		{} -> 0;
+		{R} -> R
+	end.
 
 try_download(State, Hash, Doc) ->
 	#state{downloading = D} = State,

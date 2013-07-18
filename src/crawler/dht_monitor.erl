@@ -23,7 +23,8 @@ handle_event(get_peers, {InfoHash, _IP, _Port}) ->
 	crawler_stats:get_peers(),
 	%spawn(?MODULE, process_infohash_event, [InfoHash]);
 	MagHash = dht_id:tohex(InfoHash),
-	db_hash:insert(MagHash);
+	%db_hash:insert(MagHash);
+	hash_cache_writer:insert(MagHash);
 
 handle_event(startup, {MyID}) ->
 	spawn(?MODULE, tell_more_nodes, [MyID]).
