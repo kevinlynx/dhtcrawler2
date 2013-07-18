@@ -13,6 +13,6 @@
                         http_handler,index_builder,index_download,index_file,
                         loc_torrent,loc_torrent_cache,loc_torrent_sup,
                         name_seger,rmmseg,string_split,time_util,tor_builder,
-                        tor_download,tor_download_stats,tor_location_reader,
-                        tor_location_writer,tor_name_seg,torrent_file,
-                        transfer,urldecode,vlog]}]}.
+                        tor_download,tor_download_stats,tor_location,
+                        tor_location_reader,tor_location_writer,tor_name_seg,
+                        torrent_file,transfer,urldecode,vlog]}]}.
