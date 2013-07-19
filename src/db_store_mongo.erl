@@ -116,7 +116,7 @@ index(Conn, Hash) when is_list(Hash) ->
 insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
 	NewDoc = create_torrent_desc(Conn, Hash, Name, Length, 1, Files),
 	% TODO: because of the hash_cache_writer, the new inserted torrent lost the req_cnt value
-	db_daterange:insert(Conn, Hash, 1),
+	db_daterange:insert(Conn, Hash, 1, true),
 	mongo_do(Conn, fun() ->
 		% the doc may already exist because the other process has inserted before
 		Sel = {'_id', list_to_binary(Hash)},
@@ -146,7 +146,7 @@ inc_announce(Conn, Hash, Inc) when is_list(Hash) ->
 	case Ret of
 		{value, undefined, ok, 1.0} -> false;
 		{value, _Obj, lastErrorObject, {updatedExisting, true, n, 1}, ok, 1.0} -> 
-			db_daterange:insert(Conn, Hash, Inc),
+			db_daterange:insert(Conn, Hash, Inc, false),
 			true;
 		_ -> false
 	end.
@@ -333,9 +333,9 @@ test_index(Hash) ->
 		index(Conn, Hash)
 	end).
 
-test_insertdate(Hash) ->
+test_insertdate(Hash, UpSert) ->
 	test_content(fun(Conn) ->
-		db_daterange:insert(Conn, Hash)
+		db_daterange:insert(Conn, Hash, 1, UpSert)
 	end).
 
 -ifdef(SPHINX).

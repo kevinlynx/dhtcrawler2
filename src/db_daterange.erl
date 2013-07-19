@@ -5,7 +5,7 @@
 %% To track the most recently hashes
 %%
 -module(db_daterange).
--export([insert/3,
+-export([insert/4,
 		 lookup/3]).
 -export([start_link/1,
 		 stop/0]).
@@ -31,11 +31,11 @@ ensure_date_index(Conn) ->
 	end).
 
 % '_id': Hash, date: DaySecs, reqs: RequestCount
-insert(Conn, Hash, ReqCnt) when is_list(Hash) ->
+insert(Conn, Hash, ReqCnt, UpSert) when is_list(Hash) ->
 	DaySecs = time_util:now_day_seconds(),
 	BHash = list_to_binary(Hash),
 	% only record today new inserted torrent
-	Cmd = {findAndModify, ?COLLNAME, query, {'_id', BHash}, % upsert, true,
+	Cmd = {findAndModify, ?COLLNAME, query, {'_id', BHash}, upsert, UpSert,
 		update, {'$inc', {reqs, ReqCnt}, '$set', {?DATE_COL, DaySecs}}, fields, {'_id', 1}},
 	IRet = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
 		mongo:command(Cmd)
