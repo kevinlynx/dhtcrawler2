@@ -34,7 +34,8 @@ ensure_date_index(Conn) ->
 insert(Conn, Hash, ReqCnt) when is_list(Hash) ->
 	DaySecs = time_util:now_day_seconds(),
 	BHash = list_to_binary(Hash),
-	Cmd = {findAndModify, ?COLLNAME, query, {'_id', BHash}, upsert, true,
+	% only record today new inserted torrent
+	Cmd = {findAndModify, ?COLLNAME, query, {'_id', BHash}, % upsert, true,
 		update, {'$inc', {reqs, ReqCnt}, '$set', {?DATE_COL, DaySecs}}, fields, {'_id', 1}},
 	IRet = mongo:do(safe, master, Conn, ?DBNAME, fun() ->
 		mongo:command(Cmd)
