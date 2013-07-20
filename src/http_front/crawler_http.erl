@@ -15,6 +15,7 @@
 		 start/4,
 		 start/1,
 		 page_temp/0,
+		 get_search_keyword/1,
 	     stop/0]).
 -record(state, {html_temp, httpid}).
 
@@ -58,7 +59,7 @@ init([DBHost, DBPort, Port, PoolSize]) ->
   	{document_root, "www"},
   	{server_root, "."},
     {directory_index, ["index.html"]},
-  	{erl_script_alias, {"/e", [http_handler]}},
+  	{erl_script_alias, {"/e", [http_handler, api]}},
   	{mime_types, [{"html","text/html"}, 
   				  {"css","text/css"}, {"js","application/x-javascript"}]}]),
 	{ok, B} = file:read_file("www/page.temp"),
@@ -90,3 +91,12 @@ code_change(_, _, State) ->
 handle_info(_, State) ->
     {noreply, State}.
 
+get_search_keyword(Input) ->
+	D = urldecode:decode(Input),
+	ReqList = httpd:parse_query(D),
+	case proplists:get_value("q", ReqList) of
+		undefined -> 
+			"";
+		Keyword ->
+			Keyword
+	end.

@@ -17,7 +17,7 @@
 -define(CONTENT_TYPE, "Content-Type: text/html\r\n\r\n").
 
 search(SessionID, _Env, Input) ->
-	{K, Body} = case get_search_keyword(Input) of
+	{K, Body} = case crawler_http:get_search_keyword(Input) of
 		[] -> 
 			{"", "invalid input"};
 		Key ->
@@ -72,14 +72,6 @@ index(SessionID, _Env, Input) ->
 	end,
 	Response = simple_html("", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
-
-get_search_keyword(Input) ->
-	case string:equal(string:substr(Input, 1, 2), "q=") of
-		true ->
-			urldecode:decode(string:substr(Input, 3));
-		false ->
-			[]
-	end.
 
 get_index_hash(Input) ->
 	case string:equal(string:substr(Input, 1, 2), "q=") of
