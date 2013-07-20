@@ -17,7 +17,7 @@
 		 start_standalone/1,
 		 start_standalone/2,
 		 stop/0]).
--record(state, {work_on = [], done = [], workers = []}).
+-record(state, {scheduled = false, work_on = [], done = [], workers = []}).
 -define(WORKDIR, "sync/").
 -define(DBPOOL, index_builder_pool).
 -define(SYNC_TODAY_INTERVAL, 5*60*1000).
@@ -77,10 +77,10 @@ handle_info(sync_today, State) ->
 	% download yesterday file, to avoid time difference between server and local
 	{Yesterday, _} = time_util:seconds_to_local_time(NowSecs - 24*60*60),
 	index_download:download(self(), Yesterday),
-	{noreply, State};
+	{noreply, State#state{scheduled = false}};
 
 handle_info({sync_torrent_index, ok, FileName, Content}, State) ->
-	#state{workers = Workers, work_on = WorkOn} = State,
+	#state{scheduled = SFlag, workers = Workers, work_on = WorkOn} = State,
 	FullName = ?WORKDIR ++ FileName,
 	{NewWorkOn, NewWorkers} = case lists:member(FullName, WorkOn) of
 		true ->
@@ -92,13 +92,14 @@ handle_info({sync_torrent_index, ok, FileName, Content}, State) ->
 			Pid = start_worker(FullName),
 			{[FullName|WorkOn], [Pid|Workers]}
 	end,
-	schedule_update_today(),
-	{noreply, State#state{work_on = NewWorkOn, workers = NewWorkers}};
+	if not SFlag -> schedule_update_today(); true -> ok end,
+	{noreply, State#state{scheduled = true, work_on = NewWorkOn, workers = NewWorkers}};
 
 handle_info({sync_torrent_index, failed, FileName}, State) ->
 	?W(?FMT("today index file ~s download failed", [FileName])),
-	schedule_update_today(),
-	{noreply, State};
+	#state{scheduled = SFlag} = State,
+	if not SFlag -> schedule_update_today(); true -> ok end,
+	{noreply, State#state{scheduled = true}};
 
 handle_info({worker_done, Pid, FileName}, State) ->
 	?I(?FMT("worker ~s done", [FileName])),
