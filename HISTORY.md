@@ -1,3 +1,8 @@
+## 07.21.2013
+
+* rewrite hash_reader, now it will keep a wait_download cache
+* change hash_writer(crawler) to insert unique hash
+
 ## 07.19.2013
 
 * add simple json searhch api to http
