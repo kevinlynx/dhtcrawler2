@@ -89,7 +89,7 @@ handle_info(timeout, State) ->
 schedule_next() ->
 	case hash_download_cache:get_one() of
 		{} ->
-			timer:send_after(?WAIT_TIME);
+			timer:send_after(?WAIT_TIME, timeout);
 		Doc ->
 			gen_server:cast(self(), {process_hash, Doc})
 	end.

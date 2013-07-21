@@ -18,6 +18,7 @@
 -export([start_link/1,
 		 stop/0,
 		 insert/1,
+		 size/0,
 		 get_one/0]).
 -record(state, {cache = [], max, dbpool}).
 -define(SAVE_BATCH, 100).
@@ -34,6 +35,9 @@ insert(Doc) ->
 
 get_one() ->
 	gen_server:call(srv_name(), get_one, infinity).
+
+size() ->
+	gen_server:call(srv_name(), size).
 
 srv_name() ->
 	?MODULE.
@@ -58,6 +62,10 @@ handle_cast({insert, Doc}, State) ->
 handle_cast(stop, State) ->
 	{stop, normal, State}.
 
+handle_call(size, _From, State) ->
+	#state{cache = Cache} = State,
+	{reply, length(Cache), State};
+	
 handle_call(get_one, _From, State) ->
 	#state{dbpool = DBPool, cache = Cache} = State,
 	{Doc, NewCache} = try_load(DBPool, Cache),
