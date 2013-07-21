@@ -94,8 +94,12 @@ do_save(DBPool, Docs) ->
 try_load(DBPool, []) ->
 	?T("download_cache empty, load hash from db"),
 	Conn = mongo_pool:get(DBPool),
-	{Doc} = hash_reader_common:load_delete_doc(Conn, ?HASH_DOWNLOAD_COLL),
-	{Doc, []};
+	case hash_reader_common:load_delete_doc(Conn, ?HASH_DOWNLOAD_COLL) of
+		{Doc} ->
+			{Doc, []};
+		{} ->
+			{{}, []}
+	end;
 try_load(_, [First|Rest]) ->
 	{First, Rest}.
 
