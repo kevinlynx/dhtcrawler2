@@ -69,9 +69,9 @@ child_id(Index) ->
 	list_to_atom(lists:flatten(io_lib:format("hash_reader_~p", [Index]))).
 
 config_default() ->
-	[{save_torrent, true},
+	[{save_torrent, false},
 	 {save_to_db, false},
-	 {save_to_file, true},
+	 {save_to_file, false},
 	 {load_from_db, false},
 	 {text_seg, simple},
 	 {check_cache, false},
