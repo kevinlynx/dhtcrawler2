@@ -36,11 +36,12 @@ start_standalone(IP, Port, Size) ->
 	config:start_link("hash_reader.config", fun() -> config_default() end),
 	tor_name_seg:init(),
 	% NOTE:
+	DownloadCache = {hash_download_cache, {hash_download_cache, start_link, [?DBPOOLNAME]}, permanent, 2000, worker, [hash_download_cache]},
 	Stats = {hash_reader_stats, {hash_reader_stats, start_link, [Size]}, permanent, 2000, worker, [hash_reader_stats]},
 	DownloadStats = {tor_download_stats, {tor_download_stats, start_link, []}, permanent, 2000, worker, [tor_download_stats]},
 	Log = {vlog, {vlog, start_link, ["log/hash_reader.log", 3]}, permanent, 2000, worker, [vlog]},
 	DBDateRange = {db_daterange, {db_daterange, start_link, [?DBPOOLNAME]}, permanent, 1000, worker, [db_daterange]},
-	start_link(IP, Port, Size, [Log, DBDateRange, DownloadStats, Stats]).
+	start_link(IP, Port, Size, [Log, DownloadCache, DBDateRange, DownloadStats, Stats]).
 
 start_link(IP, Port, Size) ->
 	start_link(IP, Port, Size, []).
@@ -62,7 +63,7 @@ init([PoolName, Size, OtherProcess]) ->
     {ok, {Spec, Children}}.
 
 create_child(PoolName, Index) ->
-	{child_id(Index), {hash_reader, start_link, [PoolName]}, 
+	{child_id(Index), {hash_reader2, start_link, [PoolName]}, 
 		permanent, 1000, worker, dynamic}.
 
 child_id(Index) ->
@@ -75,5 +76,6 @@ config_default() ->
 	 {load_from_db, false},
 	 {text_seg, simple},
 	 {check_cache, false},
+	 {max_download_cache, 100},
 	 {max_download_per_reader, 100},
 	 {torrent_path, "torrents/"}].

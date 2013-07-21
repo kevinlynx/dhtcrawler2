@@ -15,6 +15,7 @@
          terminate/2,
          code_change/3]).
 -export([start_link/5, stop/0, insert/1]).
+-export([do_save/1]). % to avoid unused warning
 -record(state, {cache_time, cache_max}).
 -define(TBLNAME, hash_table).
 -define(DBPOOL, hash_write_db).
@@ -57,7 +58,7 @@ handle_call(_, _From, State) ->
 
 handle_info(do_save_cache, #state{cache_time = Time} = State) ->
 	?T("timeout to save cache hashes"),
-	do_save(table_size(?TBLNAME)),
+	do_save_merge(table_size(?TBLNAME)),
 	schedule_save(Time),
 	{noreply, State};
 
@@ -83,10 +84,36 @@ try_save(#state{cache_max = Max}) ->
 
 try_save(Size, Max) when Size >= Max ->
 	?T(?FMT("try save all cache hashes ~p", [Size])),
-	do_save(Size);
+	do_save_merge(Size);
 try_save(_, _) ->
 	ok.
 
+%% new method
+%% merge hashes into database, to decrease hashes processed by hash_reader
+do_save_merge(0) ->
+	ok;
+do_save_merge(_) ->
+	First = ets:first(?TBLNAME),
+	ReqAt = time_util:now_seconds(),
+	do_save(First, ReqAt),
+	ets:delete_all_objects(?TBLNAME).
+	
+do_save('$end_of_table', _) ->
+	0;
+do_save(Key, ReqAt) ->
+	Conn = mongo_pool:get(?DBPOOL),
+	ReqCnt = get_req_cnt(Key),
+	BHash = list_to_binary(Key),
+	Cmd = {findAndModify, ?HASH_COLLNAME, query, {'_id', BHash},
+		update, {'$inc', {req_cnt, ReqCnt}, '$set', {req_at, ReqAt}}, 
+		fields, {'_id', 1}, upsert, true, new, false},
+	mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
+		mongo:command(Cmd)
+	end),
+	Next = ets:next(?TBLNAME, Key),
+	ReqCnt + do_save(Next, ReqAt).
+
+%% old method
 do_save(0) ->
 	ok;
 do_save(_) ->

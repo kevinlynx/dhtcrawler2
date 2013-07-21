@@ -1,3 +1,16 @@
+## 07.21.2013
+
+* rewrite hash_reader, now it will keep a wait_download cache
+* change hash_writer(crawler) to insert unique hash
+
+## 07.19.2013
+
+* add simple json searhch api to http
+
+## 07.15.2013
+
+* crawler now will keep a hash cache, merge same hash in the cache, this makes hash_reader process less hashes
+
 ## 07.08.2013
 
 * add torrent importer which can import local torrents into torrents database

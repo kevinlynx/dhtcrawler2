@@ -106,7 +106,7 @@ handle_info(M, State) ->
 
 handle_cast({process_hash, Doc,  DownloadDoc}, State) ->
 	Conn = db_conn(State),
-	{Hash} = bson:lookup(hash, Doc),
+	{Hash} = bson:lookup('_id', Doc), % lookup(hash, Doc)
 	ReqCnt = get_req_cnt(Doc), 
 	ListHash = binary_to_list(Hash),
 	?T(?FMT("process a hash ~s download-doc ~p", [ListHash, DownloadDoc])),
@@ -214,7 +214,7 @@ got_torrent(State, Hash, multi, {Root, Files}) ->
 % insert the doc to the `wait-download' collection, and when the 
 % downloader is free, it will download this doc.
 insert_to_download_wait(Conn, Doc) ->
-	{ID} = bson:lookup('_id', Doc),
+	{ID} = bson:lookup('_id', Doc), % lookup(hash, Doc)
 	Sel = {'_id', ID},
 	mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
 		% may exist already
@@ -229,7 +229,7 @@ check_in_index_cache(_, {}) ->
 	timer:send_after(?WAIT_TIME, timeout),
 	empty;
 check_in_index_cache(Conn, {Doc}) ->
-	{Hash} = bson:lookup(hash, Doc),
+	{Hash} = bson:lookup('_id', Doc), % lookup(hash, Doc)
 	ListHash = binary_to_list(Hash),
 	Try = should_try_download(config:get(check_cache, false), Conn, ListHash),
 	case Try of
