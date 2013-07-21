@@ -95,11 +95,14 @@ do_save_merge(0) ->
 do_save_merge(_) ->
 	First = ets:first(?TBLNAME),
 	ReqAt = time_util:now_seconds(),
-	do_save(First, ReqAt),
+	{ReqSum, NewSum} = do_save(First, ReqAt),
+	Conn = mongo_pool:get(?DBPOOL),
+	db_system:stats_cache_query_inserted(Conn, NewSum),
+	db_system:stats_query_inserted(Conn, ReqSum),
 	ets:delete_all_objects(?TBLNAME).
 	
 do_save('$end_of_table', _) ->
-	0;
+	{0, 0};
 do_save(Key, ReqAt) ->
 	Conn = mongo_pool:get(?DBPOOL),
 	ReqCnt = get_req_cnt(Key),
@@ -107,11 +110,18 @@ do_save(Key, ReqAt) ->
 	Cmd = {findAndModify, ?HASH_COLLNAME, query, {'_id', BHash},
 		update, {'$inc', {req_cnt, ReqCnt}, '$set', {req_at, ReqAt}}, 
 		fields, {'_id', 1}, upsert, true, new, false},
-	mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
+	Ret = mongo:do(safe, master, Conn, ?HASH_DBNAME, fun() ->
 		mongo:command(Cmd)
 	end),
+	New = case Ret of
+		{value, _Obj, lastErrorObject, {updatedExisting, true, n, 1}, ok, 1.0} -> 
+			0;
+		_ -> 
+			1
+	end,
 	Next = ets:next(?TBLNAME, Key),
-	ReqCnt + do_save(Next, ReqAt).
+	{ReqSum, NewSum} = do_save(Next, ReqAt),
+	{ReqCnt + ReqSum, New + NewSum}.
 
 %% old method
 do_save(0) ->

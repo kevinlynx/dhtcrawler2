@@ -106,6 +106,7 @@ schedule_download(Conn, Pid, Hash) ->
 
 try_download(false, _, _, Hash) ->
 	?T(?FMT("hash does not exist in index_cache, filter it ~s", [Hash])),
+	hash_reader_stats:handle_cache_filtered(),
 	0;
 try_download(true, Conn, Pid, Hash) ->
 	case loc_torrent_cache:load(Conn, Hash) of
