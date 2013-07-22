@@ -29,4 +29,8 @@
 
 -define(FMT(S, A), lists:flatten(io_lib:format(S, A))).
 
+% force to string
+-define(LOG_STR(Lvl, X), 
+    vlog:format(Lvl, "~s [~s] {~p, ~p}: ~s~n", 
+    	[?LVLS(Lvl), vlog:time_string(), ?MODULE, ?LINE, X])).
 -endif.

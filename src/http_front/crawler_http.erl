@@ -17,6 +17,7 @@
 		 page_temp/0,
 	     stop/0]).
 -record(state, {html_temp, httpid}).
+-include("vlog.hrl").
 
 % start from command line, erl -run crawler_http start localhost 27017 8000 5
 start([DBHostS, DBPortS, PortS, PoolSizeS]) ->
@@ -27,6 +28,8 @@ start([DBHostS, DBPortS, PortS, PoolSizeS]) ->
 	start(DBHost, DBPort, HttpPort, PoolSize).
 
 start(DBHost, DBPort, Port, PoolSize) ->
+	filelib:ensure_dir("log/"),
+	vlog:start_link("log/crawler_http.log", ?INFO),
 	code:add_path("deps/bson/ebin"),
 	code:add_path("deps/mongodb/ebin"),
 	Apps = [crypto, public_key, ssl, inets, bson, mongodb],	
@@ -46,6 +49,7 @@ srv_name() ->
 	crawler_http.
 
 init([DBHost, DBPort, Port, PoolSize]) ->
+	?I(?FMT("httpd startup ~p", [Port])),
 	process_flag(trap_exit, true),
 	db_frontend:start(DBHost, DBPort, PoolSize),
 	http_cache:start_link(),

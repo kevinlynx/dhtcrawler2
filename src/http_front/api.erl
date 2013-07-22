@@ -13,13 +13,16 @@
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -define(MAX_FILE, 3).
 -define(CONTENT_TYPE, "Content-Type: application/json\r\n\r\n").
+-include("vlog.hrl").
 
 % search?q=keyword
-search(SessionID, _Env, Input) ->
+search(SessionID, Env, Input) ->
 	Res = case http_common:get_search_keyword(Input) of
 		[] -> 
 			"{\"error\":\"null input\", \"suggest\":\"api/search?q=keyword\"}";
 		Keyword ->
+			US = http_common:list_to_utf_binary(Keyword),
+			?LOG_STR(?INFO, ?FMT("API: remote ~p search /~s/", [http_common:remote_addr(Env), US])),
 			do_search(Keyword)
 	end,	
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Res]).
@@ -48,6 +51,9 @@ stats(SessionID, _Env, _Input) ->
 do_search(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
+	CostSecs = Cost / 1000 / 1000,
+	US = http_common:list_to_utf_binary(Keyword),
+	?LOG_STR(?INFO, ?FMT("API: search /~s/ found ~p, cost ~f secs", [US, Scanned, CostSecs])),
 	Tip = ?TEXT("{\"keyword\":\"~s\",\"found\":~p,\"cost\":~p,", [Keyword, Scanned, Cost div 1000]),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("\"results\":[~s]}", [BodyList]),

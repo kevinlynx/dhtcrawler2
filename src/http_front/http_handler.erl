@@ -15,12 +15,15 @@
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -import(torrent_file, [size_string/1]).
 -define(CONTENT_TYPE, "Content-Type: text/html\r\n\r\n").
+-include("vlog.hrl").
 
-search(SessionID, _Env, Input) ->
+search(SessionID, Env, Input) ->
 	{K, Body} = case http_common:get_search_keyword(Input) of
 		[] -> 
 			{"", "invalid input"};
 		Key ->
+			US = http_common:list_to_utf_binary(Key),
+			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
 			{Key, do_search(Key)}
 	end,
 	Response = simple_html(K, Body),
@@ -87,8 +90,11 @@ do_search(Keyword) when length(Keyword) =< 1 ->
 do_search(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
+	CostSecs = Cost / 1000 / 1000,
+	US = http_common:list_to_utf_binary(Keyword),
+	?LOG_STR(?INFO, ?FMT("search /~s/ found ~p, cost ~f secs", [US, Scanned, CostSecs])),
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds</h4>", 
-		[Keyword, Scanned, Cost / 1000 / 1000]),
+		[Keyword, Scanned, CostSecs ]),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body.
