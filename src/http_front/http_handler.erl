@@ -17,7 +17,7 @@
 -define(CONTENT_TYPE, "Content-Type: text/html\r\n\r\n").
 
 search(SessionID, _Env, Input) ->
-	{K, Body} = case crawler_http:get_search_keyword(Input) of
+	{K, Body} = case http_common:get_search_keyword(Input) of
 		[] -> 
 			{"", "invalid input"};
 		Key ->
@@ -64,7 +64,7 @@ format_stats_list(Stats) ->
 	simple_html("", Body).
 
 index(SessionID, _Env, Input) ->
-	Body = case get_index_hash(Input) of
+	Body = case http_common:get_view_hash(Input) of
 		[] ->
 			"invalid hash";
 		Hash ->
@@ -72,14 +72,6 @@ index(SessionID, _Env, Input) ->
 	end,
 	Response = simple_html("", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
-
-get_index_hash(Input) ->
-	case string:equal(string:substr(Input, 1, 2), "q=") of
-		true ->
-			string:substr(Input, 3);
-		false ->
-			[]
-	end.
 
 simple_html(Key, Body) ->
  	?TEXT(crawler_http:page_temp(), [Key, Body]).
@@ -111,9 +103,10 @@ format_one_result({multi, Hash, {Name, Files}, Announce, CTime}, ShowAll) ->
 	format_one_result(Hash, Name, Files, Announce, CTime, ShowAll).
 
 format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
+	SortedFiles = http_common:sort_file_by_size(Files),
 	?TEXT("<li><p class=\"search-title\">
 		<a target='_blank' href=\"/e/http_handler:index?q=~s\">~s</a></p><ul>~s</ul>",
-		[Hash, Name, format_files(Files, ShowAll)]) ++
+		[Hash, Name, format_files(SortedFiles, ShowAll)]) ++
 	?TEXT("<p class=\"search-detail\">Index at: ~s  |  File count: ~p  |  Query count: ~p
 		<a href=\"~s\" class=\"download-tip\">  Download</a></p>",
 		[format_time_string(CTime), length(Files), Announce, format_magnet(Hash)]).

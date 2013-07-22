@@ -5,28 +5,64 @@
 %% HTTP API
 %%
 -module(api).
--export([search/3]).
+-export([search/3,
+		 today_top/3,
+		 stats/3,
+		 index/3]).
 -compile(export_all).
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
--define(MAX_FILE, 10).
+-define(MAX_FILE, 3).
+-define(CONTENT_TYPE, "Content-Type: application/json\r\n\r\n").
 
+% search?q=keyword
 search(SessionID, _Env, Input) ->
-	Res = case crawler_http:get_search_keyword(Input) of
+	Res = case http_common:get_search_keyword(Input) of
 		[] -> 
 			"{\"error\":\"null input\", \"suggest\":\"api/search?q=keyword\"}";
 		Keyword ->
 			do_search(Keyword)
 	end,	
-	mod_esi:deliver(SessionID, ["Content-Type: application/json\r\n\r\n", Res]).
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Res]).
 
+% today_top
+today_top(SessionID, _Env, _Input) ->
+	Rets = http_cache:today_top(),
+	BodyList = format_search_result(Rets),
+	Body = ?TEXT("{\"results\":[~s]}", [BodyList]),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Body]).
+
+% index?q=hash
+index(SessionID, _Env, Input) ->
+	Body = case http_common:get_view_hash(Input) of
+		[] ->
+			"{\"error\":\"invalid input\"}";
+		Hash ->
+			format_view(Hash)
+	end,
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Body]).
+
+stats(SessionID, _Env, _Input) ->
+	Response = format_stats_list(http_cache:stats()),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+%%
 do_search(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
-	Tip = ?TEXT("{\"keyword\":\"~s\", \"found\":~p, \"cost\":~p,", [Keyword, Scanned, Cost div 1000]),
+	Tip = ?TEXT("{\"keyword\":\"~s\",\"found\":~p,\"cost\":~p,", [Keyword, Scanned, Cost div 1000]),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("\"results\":[~s]}", [BodyList]),
 	Tip ++ Body.
 	
+format_view(Hash) ->
+	case db_frontend:search_one(Hash) of
+		{} -> "{\"error\":\"not found\"}";
+		Torrent ->
+			format_torrent_detail(Torrent)
+	end.
+
+format_torrent_detail(Torrent) ->
+	format_one_result(Torrent, true).
+
 format_search_result([]) ->
 	"";
 format_search_result([First|Rest]) ->
@@ -39,10 +75,13 @@ format_one_result({single, Hash, {Name, Length}, Announce, CTime}, ShowAll) ->
 format_one_result({multi, Hash, {Name, Files}, Announce, CTime}, ShowAll) ->	
 	format_one_result(Hash, Name, Files, Announce, CTime, ShowAll).
 
+% {"hash":"abc", "name":"abc", "created_at":time, "req":count, "file_cnt":cnt, 
+% 	"files":[{"name":"abc", "size":size}]}
 format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
-	?TEXT("{\"hash\":\"~s\", \"name\":\"~s\", \"created_at\":~p, \"req\":~p,",
-		[Hash, Name, CTime, Announce]) ++
-	"\"files\":[" ++ format_files(Files, ShowAll) ++ "]}".
+	SortedFiles = http_common:sort_file_by_size(Files),
+	?TEXT("{\"hash\":\"~s\",\"name\":\"~s\",\"created_at\":~p,\"req\":~p,\"file_cnt\":~p,",
+		[Hash, Name, CTime, Announce, length(Files)]) ++
+	"\"files\":[" ++ format_files(SortedFiles, ShowAll) ++ "]}".
 
 format_files([], _) ->
 	"";
@@ -51,7 +90,7 @@ format_files(Files, false) ->
 	Max = ?MAX_FILE,
 	Sub = case length(Files) >= Max of
 		true ->
-			lists:sublist(Files, Max) ++ [{more, length(Files) - Max}];
+			lists:sublist(Files, Max);
 		false ->
 			Files
 	end,
@@ -69,6 +108,21 @@ format_file({more, Len}) ->
 
 format_file({Name, Length}) ->
 	?TEXT("{\"name\":\"~s\",\"size\":~b}", [Name, Length]).
+
+format_stats_list(Stats) ->
+	{TorSum, StatsList} = Stats,
+	?TEXT("{\"total\":~p, \"stats\":[", [TorSum]) ++
+	do_format_stats(StatsList) ++ "]}".
+
+do_format_stats([]) ->
+	"";
+do_format_stats([First|Rest]) ->
+	S = [format_stats(First)] ++ ["," ++ format_stats(Stats) || Stats <- Rest],
+	lists:flatten(S).
+
+format_stats({DaySec, Processed, RecvQuery, Updated, New}) ->
+	?TEXT("{\"day_secs\":~p, \"recv\":~p, \"process\":~p, \"update\":~p, \"new\":~p}",
+		[DaySec, RecvQuery, Processed, Updated, New]).
 
 %%
 test_search(Keyword) ->
