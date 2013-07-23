@@ -154,8 +154,7 @@ format_stats([]) ->
 
 format_stats([Stats|Rest]) ->
 	[DaySec|Vals] = http_common:stats_to_list(Stats),
-	?TEXT("<li>~s RecvQuery ~p ProcessedQuery ~p Updated ~p <b>New ~p</b>
-		UniqueQuery ~p CacheFiltered ~p</li>", 
+	?TEXT("<li>~s RecvQ ~p ProcessQ ~p Updated ~p <b>New ~p</b> UniqueQ ~p Filtered ~p</li>",
 		[format_date_string(DaySec)|Vals]) ++
 	format_stats(Rest).
 
