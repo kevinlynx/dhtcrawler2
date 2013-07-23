@@ -104,8 +104,9 @@ schedule_download(Conn, Pid, Hash) ->
 	end,
 	try_download(Down, Conn, Pid, Hash).
 
-try_download(false, _, _, Hash) ->
+try_download(false, Conn, _, Hash) ->
 	?T(?FMT("hash does not exist in index_cache, filter it ~s", [Hash])),
+	db_system:stats_filtered(Conn),
 	hash_reader_stats:handle_cache_filtered(),
 	0;
 try_download(true, Conn, Pid, Hash) ->

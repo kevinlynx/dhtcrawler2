@@ -8,6 +8,8 @@
 		 get_view_hash/1,
 		 remote_addr/1,
 		 list_to_utf_binary/1,
+		 lookup_stats_item/2,
+		 stats_to_list/1,
 		 sort_file_by_size/1]).
 
 remote_addr(Env) ->
@@ -42,4 +44,13 @@ list_to_utf_binary(L) ->
 	US = unicode:characters_to_binary(UL),
 	US.
 
+lookup_stats_item(Stats, Field) ->
+	case bson:lookup(Field, Stats) of
+		{} -> 0;
+		{Val} -> Val
+	end.
 
+stats_to_list(Stats) ->
+	Fileds = ['_id', get_peers_query, get_peers, updated, new_saved, 
+		inserted_query, filter_hash],
+	[lookup_stats_item(Stats, F) || F <- Fileds].

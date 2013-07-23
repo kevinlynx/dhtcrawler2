@@ -152,9 +152,11 @@ format_magnet(MagHash) ->
 format_stats([]) ->
 	[];
 
-format_stats([{DaySec, Processed, RecvQuery, Updated, New}|Rest]) ->
-	?TEXT("<li>~s RecvQuery ~p ProcessedQuery ~p Updated ~p New ~p</li>", 
-		[format_date_string(DaySec), RecvQuery, Processed, Updated, New]) ++ 
+format_stats([Stats|Rest]) ->
+	[DaySec|Vals] = http_common:stats_to_list(Stats),
+	?TEXT("<li>~s RecvQuery ~p ProcessedQuery ~p Updated ~p <b>New ~p</b>
+		UniqueQuery ~p CacheFiltered ~p</li>", 
+		[format_date_string(DaySec)|Vals]) ++
 	format_stats(Rest).
 
 format_time_string(Secs) ->

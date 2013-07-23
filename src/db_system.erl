@@ -10,8 +10,8 @@
 -export([stats_new_saved/1,
 		 stats_updated/1,
 		 stats_query_inserted/2,
-		 stats_day_at/2,
 		 stats_day_at_slave/2,
+		 stats_filtered/1,
 		 stats_get_peers/1]).
 -export([get_torrent_id/1]).
 -compile(export_all).
@@ -93,38 +93,27 @@ stats_query_inserted(Conn, Count) ->
 stats_cache_query_inserted(Conn, Count) ->
 	stats_inc_field(Conn, inserted_query, Count).
 
+stats_filtered(Conn) ->
+	stats_inc_field(Conn, filter_hash).
+
 stats_inc_field(Conn, Filed) ->
 	stats_inc_field(Conn, Filed, 1).
 
-stats_inc_field(Conn, Filed, Inc) ->
+stats_inc_field(Conn, Field, Inc) ->
 	TodaySecs = time_util:now_day_seconds(),
-	mongo:do(unsafe, master, Conn, ?DBNAME, fun() ->
-		Doc = stats_ensure_today(TodaySecs),
-		{Val} = bson:lookup(Filed, Doc),
-		NewDoc = bson:update(Filed, Val + Inc, Doc),
-		mongo:update(?STATS_COLLNAME, {'_id', TodaySecs}, NewDoc)
-	end).
-
-stats_day_at(Conn, DaySec) ->
+	Cmd = {findAndModify, ?STATS_COLLNAME, query, {'_id', TodaySecs}, 
+		upsert, true, update, {'$inc', {Field, Inc}}, field, {'_id', 1}},
 	mongo:do(safe, master, Conn, ?DBNAME, fun() ->
-		stats_ensure_today(DaySec)
+		mongo:command(Cmd)
 	end).
 
 stats_day_at_slave(Conn, DaySec) ->
-	mongo:do(safe, slave_ok, Conn, ?DBNAME, fun() ->
-		stats_ensure_today(DaySec)
-	end).
-
-stats_ensure_today(TodaySecs) ->
-	case mongo:find_one(?STATS_COLLNAME, {'_id', TodaySecs}) of
-		{} ->
-			NewDoc = {'_id', TodaySecs, get_peers, 0, get_peers_query, 0,
-				inserted_query, 0, % because has_cache_writer will merge some queries
-				updated, 0, new_saved, 0},
-			mongo:insert(?STATS_COLLNAME, NewDoc),
-			NewDoc;
-		{Doc} ->
-			Doc	
+	Ret = mongo:do(safe, slave_ok, Conn, ?DBNAME, fun() ->
+		mongo:find_one(?STATS_COLLNAME, {'_id', DaySec})
+	end),
+	case Ret of
+		{} -> {};
+		{Doc} -> Doc
 	end.
 
 %%

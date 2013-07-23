@@ -54,15 +54,7 @@ stats() ->
 	D1 = db_system:stats_day_at_slave(Conn, DaySecs),
 	D2 = db_system:stats_day_at_slave(Conn, DaySecs - ?ONEDAY_SECS),
 	D3 = db_system:stats_day_at_slave(Conn, DaySecs - 2 * ?ONEDAY_SECS),
-	{TorSum, [decode_stats(D1), decode_stats(D2), decode_stats(D3)]}.
-
-decode_stats(Stats) ->
-	{DaySec} = bson:lookup('_id', Stats),
-	{Processed} = bson:lookup(get_peers, Stats),
-	{RecvQuery} = bson:lookup(get_peers_query, Stats),
-	{Updated} = bson:lookup(updated, Stats),
-	{New} = bson:lookup(new_saved, Stats),
-	{DaySec, Processed, RecvQuery, Updated, New}.
+	{TorSum, [D1, D2, D3]}.
 
 % test only
 all_top() ->

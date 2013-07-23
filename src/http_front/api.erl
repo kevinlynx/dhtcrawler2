@@ -126,9 +126,11 @@ do_format_stats([First|Rest]) ->
 	S = [format_stats(First)] ++ ["," ++ format_stats(Stats) || Stats <- Rest],
 	lists:flatten(S).
 
-format_stats({DaySec, Processed, RecvQuery, Updated, New}) ->
-	?TEXT("{\"day_secs\":~p, \"recv\":~p, \"process\":~p, \"update\":~p, \"new\":~p}",
-		[DaySec, RecvQuery, Processed, Updated, New]).
+format_stats(Stats) ->
+	Vals = http_common:stats_to_list(Stats),
+	?TEXT("{\"day_secs\":~p, \"recv\":~p, \"process\":~p, \"update\":~p, \"new\":~p,
+		\"unique\":~p, \"filtered\":~p}",
+		Vals).
 
 %%
 test_search(Keyword) ->
