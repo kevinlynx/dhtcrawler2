@@ -14,4 +14,7 @@ dhtcrawler is a DHT crawler written in erlang. It can join a DHT network and cra
 
         rebar compile
 
+## LICENSE
+
+See LICENSE.txt
 
