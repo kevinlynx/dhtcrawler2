@@ -42,3 +42,6 @@ It's not related about dhtcrawler, but only Mongodb, try figure it yourself.
 
 Yes of course you can write another http front-end UI based on the torrent database, if you're interested in it I can help you about the database format.
 
+## LICENSE
+
+See LICENSE.txt
