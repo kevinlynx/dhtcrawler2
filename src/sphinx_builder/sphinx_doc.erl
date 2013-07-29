@@ -17,7 +17,7 @@ write_xml(File, Elems) ->
 
 element(Hash, Name, Files, ID, Query, CreatedAt) when is_list(Hash), length(Hash) == 40 ->
 	IDSet = idset(Hash),
-	OtherAttrs = [{query, [integer_to_list(Query)]}, {created_at, integer_to_list(CreatedAt)}],
+	OtherAttrs = [{query, [], [integer_to_list(Query)]}, {created_at, [], [integer_to_list(CreatedAt)]}],
 	EleSubject = {subject, [], [with_cdata(Name)]},
 	EleFiles = {files, [], [with_cdata(files_name(Files))]},
 	{'sphinx:document', [{id, integer_to_list(ID)}], IDSet ++ OtherAttrs ++ [EleSubject, EleFiles, ?CR]}.
@@ -67,3 +67,13 @@ filter_name(Name) ->
 with_cdata(Text) ->
 	"<![CDATA[" ++ Text ++ "]]>".
 
+%%
+test_utf8() ->
+	E = element("33FB6D00DD5E363653235449527EC1DC9959FCAB", "名字",
+		[{"文件1", 1}, {"文件2", 2}], 1, 0, 0),
+	write_xml("sphinx.xml", [E]).
+
+test() ->
+	E = element("33FB6D00DD5E363653235449527EC1DC9959FCAB", "name<abc>",
+		[{"f1", 1}, {"f2<def>/aaa/def/\"'", 2}], 1, 0, 0),
+	write_xml("sphinx.xml", [E]).
