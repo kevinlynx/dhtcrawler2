@@ -5,6 +5,7 @@
 %%
 -module(http_handler).
 -export([search/3,
+		 sphinx_search/3,
 		 test_search/1,
 		 index/3,
 		 stats/3,
@@ -25,6 +26,18 @@ search(SessionID, Env, Input) ->
 			US = http_common:list_to_utf_binary(Key),
 			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
 			{Key, do_search(Key)}
+	end,
+	Response = simple_html(K, Body),
+	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
+
+sphinx_search(SessionID, Env, Input) ->
+	{K, Body} = case http_common:get_search_keyword(Input) of
+		[] -> 
+			{"", "invalid input"};
+		Key ->
+			US = http_common:list_to_utf_binary(Key),
+			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
+			{Key, do_search_sphinx(Key)}
 	end,
 	Response = simple_html(K, Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
@@ -99,6 +112,12 @@ do_search(Keyword) ->
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body.
 	
+do_search_sphinx(Keyword) ->
+	Rets = db_frontend:search_by_sphinx(Keyword),
+	BodyList = format_search_result(Rets),
+	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
+	Body.
+
 format_search_result(RetList) ->
 	[format_one_result(Result, false) || Result <- RetList].
 

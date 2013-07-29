@@ -38,3 +38,11 @@
     [debug_info,   
 		{i, "include"},
     	{outdir,"ebin"}]}.
+{'src/utils/*',
+    [debug_info,   
+		{i, "include"},
+    	{outdir,"ebin"}]}.
+{'src/sphinx_builder/*',
+    [debug_info,   
+		{i, "include"},
+    	{outdir,"ebin"}]}.

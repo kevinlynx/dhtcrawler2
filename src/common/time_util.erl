@@ -9,7 +9,9 @@
 		 seconds_to_local_time/1,
 		 local_time_to_universal_time/1,
 		 now_utc_time/0,
-		 now_day_seconds/0]).
+		 now_day_seconds/0,
+		 date_time_string/0,
+		 date_time_stamp/0]).
 -compile(export_all).
 
 diff_milsecs(T1, T2) ->
@@ -38,3 +40,15 @@ local_time_to_universal_time(Datetime) ->
 
 now_utc_time() ->
 	local_time_to_universal_time(calendar:local_time()).
+
+date_time_string() ->
+ 	{{Y, M, D}, {H, Min, Sec}} = calendar:local_time(),
+ 	L = io_lib:format("~b-~2..0b-~2..0b ~2..0b:~2..0b:~2..0b",
+		[Y, M, D, H, Min, Sec]),
+ 	lists:flatten(L).
+
+date_time_stamp() ->
+ 	{{Y, M, D}, {H, Min, Sec}} = calendar:local_time(),
+ 	L = io_lib:format("~b~2..0b~2..0b~2..0b~2..0b~2..0b",
+		[Y, M, D, H, Min, Sec]),
+ 	lists:flatten(L).
