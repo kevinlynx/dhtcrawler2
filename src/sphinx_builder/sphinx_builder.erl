@@ -32,7 +32,7 @@ init([IP, Port, WorkerCnt]) ->
 	{ok, #state{processed = Offset, worker_cnt = WorkerCnt}}.
 
 handle_call({get, Pid}, _From, State) ->
-	#state{processed = Processed, worker_cnt = WaitCnt, wait_workers = WaitWorkers} = State,
+	#state{processed = Processed, worker_cnt = WorkerCnt, wait_workers = WaitWorkers} = State,
 	{NewProcessed, Ret} = case sphinx_torrent:get() of
 		{} -> 
 			{Processed, wait};
@@ -41,7 +41,7 @@ handle_call({get, Pid}, _From, State) ->
 			{Processed + 1, Tor}
 	end,
 	NewWaits = update_wait_workers(Pid, NewProcessed, Processed, WaitWorkers),
-	check_all_done(NewWaits, WaitCnt, NewProcessed, length(NewWaits) > length(WaitWorkers)),
+	check_all_done(NewWaits, WorkerCnt, NewProcessed, length(NewWaits) > length(WaitWorkers)),
 	{reply, {NewProcessed, Ret}, State#state{processed = NewProcessed, wait_workers = NewWaits}}.
 
 handle_cast(_, State) ->
@@ -66,8 +66,8 @@ update_wait_workers(Pid, NewProcessed, Processed, WaitWorkers) ->
 			WaitWorkers
 	end.
 
-check_all_done(WaitWorkers, WaitCnt, Processed, true) 
-when length(WaitWorkers) == WaitCnt ->
+check_all_done(WaitWorkers, WorkerCnt, Processed, true) 
+when length(WaitWorkers) == WorkerCnt ->
 	Try = sphinx_torrent:try_times(),
 	case Try > 5 of 
 		true ->
