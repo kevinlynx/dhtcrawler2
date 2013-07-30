@@ -84,7 +84,7 @@ check_all_done(_WaitWorkers, _WaitCnt, _Processed, Saved) ->
 	Saved.
 
 worker_run() ->
-	Ret = gen_server:call(srv_name(), {get, self()}),
+	Ret = gen_server:call(srv_name(), {get, self()}, infinity),
 	do_process(Ret),
 	worker_run().
 
