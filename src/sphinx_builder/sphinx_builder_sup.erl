@@ -6,6 +6,7 @@
 -module(sphinx_builder_sup).
 -behaviour(supervisor).
 -export([start_standalone/1, start_standalone/3, start_link/3]).
+-export([init_indexes/0]).
 -export([init/1]).
 
 start_dep_apps() ->
@@ -29,6 +30,13 @@ start_standalone(IP, Port, Size) ->
 start_link(IP, Port, Count) ->
 	supervisor:start_link({local, srv_name()}, ?MODULE, [IP, Port, Count]).
 
+init_indexes() ->
+	config:start_link("sphinx_builder.config", fun() -> config_default() end),
+	io:format("try init sphinx index files~n", []),
+	Conf = config:get(sphinx_config_file),
+	MainFile = config:get(main_source_file),
+	DeltaFile = config:get(delta_source_file),
+	sphinx_cmd:build_init_index(MainFile, DeltaFile, Conf).
 %%
 srv_name() ->
 	?MODULE.
@@ -38,14 +46,14 @@ init([IP, Port, Count]) ->
 	config:start_link("sphinx_builder.config", fun() -> config_default() end),
 	Builder = {sphinx_builder, {sphinx_builder, start_link, [IP, Port, Count]}, permanent, 1000, worker, [sphinx_builder]},
 	Indexer = {sphinx_xml, {sphinx_xml, start_link, []}, permanent, 1000, worker, [sphinx_xml]},
-	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", 0]}, permanent, 1000, worker, [vlog]},
+	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", 1]}, permanent, 1000, worker, [vlog]},
 	Children = [Logger, Builder, Indexer],
     {ok, {Spec, Children}}.
 
 config_default() ->
-	[{load_torrent_interval, 500}, % millseconds
-	 {max_doc_per_file, 1000},
+	[{max_doc_per_file, 1000},
 	 {torrent_batch_count, 100},
+	 {main_source_file, "var/source/main.xml"},
 	 {delta_source_file, "var/source/delta.xml"},
 	 {sphinx_config_file, "var/etc/csft.conf"},
 	 {delta_index_name, "delta"},

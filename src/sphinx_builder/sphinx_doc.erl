@@ -4,11 +4,15 @@
 %%
 -module(sphinx_doc).
 -include_lib("xmerl/include/xmerl.hrl").
--export([write_xml/2, element/6]).
+-export([write_test_xml/1, write_xml/2, element/6]).
 -compile(export_all).
 -define(PROLOG, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>").  
 -define(CR, #xmlText{value="\
 	"}).
+
+write_test_xml(File) ->
+	Elem = element("33FB6D00DD5E363653235449527EC1DC9959FCAB", "test", [], 1, 1, 1374508800),
+	write_xml(File, [Elem]).
 
 write_xml(File, Elems) ->
 	Doc = {'sphinx:docset', [], [schema(), ?CR] ++ Elems},

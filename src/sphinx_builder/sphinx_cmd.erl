@@ -4,9 +4,24 @@
 %% 07.28.2013
 %%
 -module(sphinx_cmd).
--export([build_delta_index/5, merge_index/3]).
+-export([build_init_index/3, build_delta_index/5, merge_index/3]).
 -compile(export_all).
 -include("vlog.hrl").
+
+build_init_index(MainFile, DeltaFile, CfgFile) ->
+	case filelib:is_file(MainFile) and filelib:is_file(DeltaFile) of
+		true ->
+			io:format("main/delta index file exists, ignore~n", []);
+		false ->
+			do_build_init_index(MainFile, DeltaFile, CfgFile)
+	end.
+
+do_build_init_index(MainFile, DeltaFile, CfgFile) ->
+	sphinx_doc:write_test_xml(MainFile),
+	sphinx_doc:write_test_xml(DeltaFile),
+	Cmd = "indexer -c " ++ CfgFile ++ " --all",
+	Ret = os:cmd(Cmd),
+	io:format("~p~n", [Ret]).
 
 % Index file, Delta index name
 build_delta_index(IndexFile, Delta, CfgFile, MinID, MaxID) ->

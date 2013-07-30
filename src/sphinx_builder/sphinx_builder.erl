@@ -14,7 +14,7 @@
          code_change/3]).
 -export([start_link/3]).
 -export([worker_run/0]).
--record(state, {processed = 0, worker_cnt, wait_workers = []}).
+-record(state, {processed = 0, saved = false, worker_cnt, wait_workers = []}).
 -define(WORKER_WAIT, 30*1000).
 -define(STATE_FILE, "priv/sphinx_builder.sta").
 
@@ -32,7 +32,8 @@ init([IP, Port, WorkerCnt]) ->
 	{ok, #state{processed = Offset, worker_cnt = WorkerCnt}}.
 
 handle_call({get, Pid}, _From, State) ->
-	#state{processed = Processed, worker_cnt = WorkerCnt, wait_workers = WaitWorkers} = State,
+	#state{processed = Processed, worker_cnt = WorkerCnt, wait_workers = WaitWorkers,
+		saved = Saved} = State,
 	{NewProcessed, Ret} = case sphinx_torrent:get() of
 		{} -> 
 			{Processed, wait};
@@ -41,8 +42,9 @@ handle_call({get, Pid}, _From, State) ->
 			{Processed + 1, Tor}
 	end,
 	NewWaits = update_wait_workers(Pid, NewProcessed, Processed, WaitWorkers),
-	check_all_done(NewWaits, WorkerCnt, NewProcessed, length(NewWaits) > length(WaitWorkers)),
-	{reply, {NewProcessed, Ret}, State#state{processed = NewProcessed, wait_workers = NewWaits}}.
+	NewSaved = (check_all_done(NewWaits, WorkerCnt, NewProcessed, Saved)) and (Ret == wait),
+	{reply, {NewProcessed, Ret}, State#state{processed = NewProcessed, wait_workers = NewWaits,
+		saved = NewSaved}}.
 
 handle_cast(_, State) ->
 	{noreply, State}.
@@ -66,19 +68,20 @@ update_wait_workers(Pid, NewProcessed, Processed, WaitWorkers) ->
 			WaitWorkers
 	end.
 
-check_all_done(WaitWorkers, WorkerCnt, Processed, true) 
+check_all_done(WaitWorkers, WorkerCnt, Processed, false) 
 when length(WaitWorkers) == WorkerCnt ->
 	Try = sphinx_torrent:try_times(),
 	case Try > 5 of 
 		true ->
 			io:format("haven't got any torrents for a while, force save~n", []),
 			save_result(Processed),
-			sphinx_xml:force_save();
+			sphinx_xml:force_save(),
+			true;
 		false ->
-			ok
+			false
 	end;
-check_all_done(_WaitWorkers, _WaitCnt, _Processed, _) ->
-	ok.
+check_all_done(_WaitWorkers, _WaitCnt, _Processed, Saved) ->
+	Saved.
 
 worker_run() ->
 	Ret = gen_server:call(srv_name(), {get, self()}),
@@ -91,9 +94,9 @@ do_process({_, wait}) ->
 do_process({ID, Doc}) ->
 	case db_store_mongo:decode_torrent_item(Doc) of
 		{single, Hash, {Name, _}, Query, CreatedAt} ->
-			sphinx_xml:insert({Hash, Name, [], ID, Query, CreatedAt});
+			sphinx_xml:insert({ID, Hash, Name, [], Query, CreatedAt});
 		{multi, Hash, {Name, Files}, Query, CreatedAt} ->
-			sphinx_xml:insert({Hash, Name, Files, ID, Query, CreatedAt})
+			sphinx_xml:insert({ID, Hash, Name, Files, Query, CreatedAt})
 	end.
 
 load_result() ->
