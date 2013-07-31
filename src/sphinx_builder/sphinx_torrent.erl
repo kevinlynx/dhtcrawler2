@@ -100,7 +100,16 @@ try_load_next(_, _) ->
 do_load_torrents(Skip, Size) ->
 	Conn = mongo_pool:get(?POOLNAME),
 	mongo:do(safe, master, Conn, ?DBNAME, fun() ->
+		% 1: cost lots of memory even close the cursor
+		%Cursor = mongo:find(?COLLNAME, {}, {}, Skip, Size),
+		%Ret = mongo_cursor:rest(Cursor), but close the cursor will reduce the memory
+		% 2: cost lots of memory more than solution 1
+		%Cursor = mongo:find(?COLLNAME, {}, {}, Skip),
+		%mongo_cursor:take(Cursor, Size),
+		% 3:
 		Cursor = mongo:find(?COLLNAME, {}, {}, Skip),
-		mongo_cursor:take(Cursor, Size)
+		Ret = mongo_cursor:take(Cursor, Size),
+		mongo_cursor:close(Cursor),
+		Ret
 	end).
 
