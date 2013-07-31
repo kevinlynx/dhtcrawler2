@@ -116,11 +116,14 @@ do_search(Keyword) ->
 	Tip ++ Body.
 	
 do_search_sphinx(Keyword, Page) ->
-	Rets = db_frontend:search_by_sphinx(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	{Stats, Rets} = db_frontend:search_by_sphinx(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	{SphinxTime, DBTime} = Stats,
 	ThisPage = lists:sublist(Rets, ?COUNT_PER_PAGE),
+	StatsDesc = ?TEXT("<h4>search ~s, sphinx ~f ms, db ~f ms</h4>", 
+		[Keyword, SphinxTime / 1000, DBTime / 1000]),
 	BodyList = format_search_result(ThisPage),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	Body ++ append_page_nav(Keyword, Page, Rets).
+	StatsDesc ++ Body ++ append_page_nav(Keyword, Page, Rets).
 
 append_page_nav(Key, Page, ThisRet) ->
 	Nav = case length(ThisRet) of 
@@ -131,7 +134,7 @@ append_page_nav(Key, Page, ThisRet) ->
 		Size when Page > 0 ->
 			format_page_nav(Key, Page - 1, "Prev") ++ 
 			if Size > ?COUNT_PER_PAGE -> 
-				"|" ++ format_page_nav(Key, Page + 1, "Next");
+				"&nbsp;" ++ format_page_nav(Key, Page + 1, "Next");
 				true -> []
 			end;
 		Size ->

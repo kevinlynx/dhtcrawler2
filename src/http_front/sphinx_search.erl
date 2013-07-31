@@ -14,13 +14,18 @@ search(Conn, Key, Offset, Count) ->
     Q2 = giza_query:port(Q1, ?PORT),
     Q3 = giza_query:offset(Q2, Offset),
     Q4 = giza_query:limit(Q3, Count),
-    case catch giza_request:send(Q4) of
+    T1 = now(),
+    {T2, TDocs} = case catch giza_request:send(Q4) of
     	{'EXIT', R} ->
     		?W(?FMT("sphinx search error ~p", [R])),
     		[];
     	{ok, Ret} ->
-    		decode_search_ret(Conn, Ret)
-    end.
+    		T = now(),
+    		{T, decode_search_ret(Conn, Ret)}
+    end,
+    T3 = now(),
+    Stats = {timer:now_diff(T2, T1), timer:now_diff(T3, T2)},
+    {Stats, TDocs}.
 
 decode_search_ret(Conn, Ret) ->
 	Hashes = [translate_hash(Item) || Item <- Ret],
