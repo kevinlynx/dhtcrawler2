@@ -16,6 +16,7 @@
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -import(torrent_file, [size_string/1]).
 -define(CONTENT_TYPE, "Content-Type: text/html\r\n\r\n").
+-define(COUNT_PER_PAGE, 10).
 -include("vlog.hrl").
 
 search(SessionID, Env, Input) ->
@@ -37,7 +38,9 @@ sphinx_search(SessionID, Env, Input) ->
 		Key ->
 			US = http_common:list_to_utf_binary(Key),
 			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
-			{Key, do_search_sphinx(Key)}
+			Args = http_common:parse_args(Input),
+			Page = case proplists:get_value("p", Args) of undefined -> 0; Val -> list_to_integer(Val) end,
+			{Key, do_search_sphinx(Key, Page)}
 	end,
 	Response = simple_html(K, Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
@@ -112,11 +115,34 @@ do_search(Keyword) ->
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body.
 	
-do_search_sphinx(Keyword) ->
-	Rets = db_frontend:search_by_sphinx(Keyword),
-	BodyList = format_search_result(Rets),
+do_search_sphinx(Keyword, Page) ->
+	Rets = db_frontend:search_by_sphinx(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	ThisPage = lists:sublist(Rets, ?COUNT_PER_PAGE),
+	BodyList = format_search_result(ThisPage),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	Body.
+	Body ++ append_page_nav(Keyword, Page, Rets).
+
+append_page_nav(Key, Page, ThisRet) ->
+	Nav = case length(ThisRet) of 
+		0 when Page > 0 ->
+			format_page_nav(Key, Page - 1, "Prev");
+		0 -> 
+			[];
+		Size when Page > 0 ->
+			format_page_nav(Key, Page - 1, "Prev") ++ 
+			if Size > ?COUNT_PER_PAGE -> 
+				"|" ++ format_page_nav(Key, Page + 1, "Next");
+				true -> []
+			end;
+		Size ->
+			if Size > ?COUNT_PER_PAGE -> format_page_nav(Key, Page + 1, "Next");
+				true -> []
+			end
+	end,
+	"<p class=\"page-nav\">" ++ Nav ++ "</p>".
+
+format_page_nav(Key, Page, Tip) ->
+	?TEXT("<a href=\"http_handler:sphinx_search?q=~s&p=~p\">~s</a>", [Key, Page, Tip]).
 
 format_search_result(RetList) ->
 	[format_one_result(Result, false) || Result <- RetList].

@@ -4,20 +4,23 @@
 %% 07.28.2013
 %%
 -module(sphinx_search).
--export([init/0, search/2]).
+-include("vlog.hrl").
+-export([search/4]).
 -define(PORT, 9312).
 -define(INDEX, "xml").
--define(PAGECNT, 10).
 
-init() ->
-	code:add_path("deps/giza/ebin").
-	%application:start(giza).
-
-search(Conn, Key) ->
+search(Conn, Key, Offset, Count) ->
     Q1 = giza_query:new(?INDEX, Key),
     Q2 = giza_query:port(Q1, ?PORT),
-    {ok, Ret} = giza_request:send(Q2),
-    decode_search_ret(Conn, Ret).
+    Q3 = giza_query:offset(Q2, Offset),
+    Q4 = giza_query:limit(Q3, Count),
+    case catch giza_request:send(Q4) of
+    	{'EXIT', R} ->
+    		?W(?FMT("sphinx search error ~p", [R])),
+    		[];
+    	{ok, Ret} ->
+    		decode_search_ret(Conn, Ret)
+    end.
 
 decode_search_ret(Conn, Ret) ->
 	Hashes = [translate_hash(Item) || Item <- Ret],

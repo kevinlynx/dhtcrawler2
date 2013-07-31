@@ -5,6 +5,7 @@
 %%
 -module(http_common).
 -export([get_search_keyword/1,
+		 parse_args/1,
 		 get_view_hash/1,
 		 remote_addr/1,
 		 list_to_utf_binary/1,
@@ -22,14 +23,17 @@ get_view_hash(Input) ->
 	get_q_arg(Input).
 
 get_q_arg(Input) ->
-	D = urldecode:decode(Input),
-	ReqList = httpd:parse_query(D),
+	ReqList = parse_args(Input),
 	case proplists:get_value("q", ReqList) of
 		undefined -> 
 			"";
 		Arg ->
 			Arg
 	end.
+
+parse_args(Input) ->
+	D = urldecode:decode(Input),
+	httpd:parse_query(D).
 
 sort_file_by_size(Files) ->
 	lists:sort(fun({_, L1}, {_, L2}) ->
