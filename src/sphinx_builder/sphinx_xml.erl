@@ -95,9 +95,4 @@ valid_file_names(Files) ->
 	[{valid_name(Name), Length} || {Name, Length} <- Files].
 
 valid_name(S) ->
-	ValidName = string_util:strip_invalid_unicode(S),
-	if length(ValidName) < length(S) ->
-		?I(?FMT("~s -> ~s", [S, ValidName]));
-		true -> ok
-	end,
-	ValidName.
+	string_util:strip_invalid_unicode(S).
