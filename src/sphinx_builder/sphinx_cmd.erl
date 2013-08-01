@@ -27,7 +27,8 @@ do_build_init_index(MainFile, DeltaFile, CfgFile) ->
 build_delta_index(IndexFile, Delta, CfgFile, MinID, MaxID) ->
 	Cmd = "indexer -c " ++ CfgFile ++ " --rotate " ++ Delta,
 	Res = os:cmd(Cmd),
-	Dest = backup_delta_file(Delta, MinID, MaxID, IndexFile),
+	Success = check_cmd_success(Res),
+	Dest = backup_delta_file(Delta, MinID, MaxID, IndexFile, Success),
 	?I(?FMT("command `~s' result on ~s~n" ++ Res, [Cmd, Dest])).
 
 merge_index(Main, Delta, CfgFile) ->
@@ -36,9 +37,13 @@ merge_index(Main, Delta, CfgFile) ->
 	Res = os:cmd(Cmd),
 	?I(?FMT("command `~s' result~n" ++ Res, [Cmd])).
 
-backup_delta_file(Delta, MinID, MaxID, IndexFile) ->
+backup_delta_file(Delta, MinID, MaxID, IndexFile, Flag) ->
 	Path = filename:dirname(IndexFile),
 	Dest = string_util:format(Path ++ "/" ++ Delta ++ "[~b-~b]" ++ ".xml",
 		[MinID, MaxID]),
-	file:copy(IndexFile, Dest),
+	if not Flag -> file:copy(IndexFile, Dest); true -> skip end,
 	Dest.
+
+% too simple
+check_cmd_success(Res) ->
+	string:str(Res, "succesfully") > 0.

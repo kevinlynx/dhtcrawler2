@@ -18,10 +18,9 @@ search(Conn, Key, Offset, Count) ->
     {T2, TDocs} = case catch giza_request:send(Q4) of
     	{'EXIT', R} ->
     		?W(?FMT("sphinx search error ~p", [R])),
-    		[];
+    		{now(), []};
     	{ok, Ret} ->
-    		T = now(),
-    		{T, decode_search_ret(Conn, Ret)}
+    		{now(), decode_search_ret(Conn, Ret)}
     end,
     T3 = now(),
     Stats = {timer:now_diff(T2, T1), timer:now_diff(T3, T2)},

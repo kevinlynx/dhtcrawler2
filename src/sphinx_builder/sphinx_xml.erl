@@ -5,6 +5,7 @@
 %%
 -module(sphinx_xml).
 -behaviour(gen_server).
+-compile(export_all).
 -include("vlog.hrl").
 -export([init/1,
          handle_call/3,
@@ -48,9 +49,9 @@ handle_cast(save, #state{docs = Docs, ids = IDs} = State) when length(Docs) > 0 
 handle_cast(stop, State) ->
 	{stop, normal, State}.
 
-handle_call({insert, {ID, Hash, Name, Files, Query, CreatedAt}}, _From, State) ->
+handle_call({insert, DocT}, _From, State) ->
 	#state{docs = Docs, ids = IDs, max = Max} = State,
-	Doc = sphinx_doc:element(Hash, Name, Files, ID, Query, CreatedAt),
+	{ID, Doc} = create_doc(DocT),
 	{NewDocs, NewIDs} = try_save([Doc|Docs], Max, [ID|IDs]),
 	{reply, ok, State#state{docs = NewDocs, ids = NewIDs}};
 
@@ -83,3 +84,20 @@ get_id_range([First|IDs]) ->
 	lists:foldl(fun(ID, {Min, Max}) ->
 		{min(ID, Min), max(ID, Max)}
 	end, {First, First}, IDs).
+
+create_doc({ID, Hash, Name, Files, Query, CreatedAt}) ->
+	ValidName = valid_name(Name),
+	ValidFiles = valid_file_names(Files),
+	Doc = sphinx_doc:element(Hash, ValidName, ValidFiles, ID, Query, CreatedAt),
+	{ID, Doc}.
+
+valid_file_names(Files) ->
+	[{valid_name(Name), Length} || {Name, Length} <- Files].
+
+valid_name(S) ->
+	ValidName = string_util:strip_invalid_unicode(S),
+	if length(ValidName) < length(S) ->
+		?I(?FMT("~s -> ~s", [S, ValidName]));
+		true -> ok
+	end,
+	ValidName.
