@@ -110,15 +110,14 @@ search_by_mongo(Keyword) ->
 	Tip ++ Body.
 	
 search_by_sphinx(Keyword, Page) ->
-	{Rets, Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	{Rets, Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE),
 	{TotalFound, CostTime, DBTime} = Stats,
 	US = http_common:list_to_utf_binary(Keyword),
 	?LOG_STR(?INFO, ?FMT("search /~s/ found ~p, cost ~b sp ms, ~b db ms", 
 		[US, length(Rets), CostTime, DBTime])),
-	ThisPage = lists:sublist(Rets, ?COUNT_PER_PAGE),
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds, db ~f seconds</h4>", 
 		[Keyword, TotalFound, CostTime / 1000, DBTime / 1000 / 1000]),
-	BodyList = format_search_result(ThisPage),
+	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body ++ append_page_nav(Keyword, Page, TotalFound).
 
