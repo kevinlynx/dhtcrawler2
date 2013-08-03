@@ -74,8 +74,9 @@ config_default() ->
 	 {save_to_db, false},
 	 {save_to_file, false},
 	 {load_from_db, false},
-	 {text_seg, simple},
-	 {check_cache, false},
+	 {search_method, mongodb}, % mongodb/sphinx
+	 {text_seg, simple}, % simple/rmmseg/none
+	 {check_cache, false}, % check in hash cache (build from torrage.com/sync) first
 	 {max_download_cache, 100},
 	 {max_download_per_reader, 100},
 	 {torrent_path, "torrents/"}].

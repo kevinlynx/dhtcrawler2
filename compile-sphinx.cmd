@@ -1,1 +1,0 @@
-rebar compile -DSPHINX

@@ -32,15 +32,19 @@ size_brief(SizeInBytes) ->
 	GT = MT * 1024,
 	if 
 		SizeInBytes < BT -> {byte, SizeInBytes};
-		SizeInBytes < KT -> {kb, SizeInBytes div BT};
-		SizeInBytes < MT -> {mb, SizeInBytes div KT};
-		SizeInBytes < GT -> {gb, SizeInBytes div MT};
+		SizeInBytes < KT -> {kb, SizeInBytes / BT};
+		SizeInBytes < MT -> {mb, SizeInBytes / KT};
+		SizeInBytes < GT -> {gb, SizeInBytes / MT};
 		true -> {byte, SizeInBytes}
 	end.
 
 size_string(SizeInBytes) ->
-	{T, N} = size_brief(SizeInBytes),
-	lists:flatten(io_lib:format("~b ~s", [N, atom_to_list(T)])).
+	format_size(size_brief(SizeInBytes)).
+
+format_size({T, N}) when T == byte ->
+	lists:flatten(io_lib:format("~b ~s", [N, atom_to_list(T)]));
+format_size({T, N}) ->
+	lists:flatten(io_lib:format("~.2.0f ~s", [N, T])).
 
 type(Info) ->
 	case dict:find(<<"files">>, Info) of 

@@ -52,6 +52,7 @@ srv_name() ->
 init([DBHost, DBPort, Port, PoolSize]) ->
 	?I(?FMT("httpd startup ~p", [Port])),
 	process_flag(trap_exit, true),
+	config:start_link("httpd.config", fun() -> config_default() end),
 	db_frontend:start(DBHost, DBPort, PoolSize),
 	http_cache:start_link(),
 	{ok, Pid} = inets:start(httpd, [
@@ -94,4 +95,8 @@ code_change(_, _, State) ->
 
 handle_info(_, State) ->
     {noreply, State}.
+
+config_default() ->
+	[{search_method, mongodb} % mongodb/sphinx
+	].
 

@@ -46,7 +46,7 @@ init([IP, Port, Count]) ->
 	config:start_link("sphinx_builder.config", fun() -> config_default() end),
 	Builder = {sphinx_builder, {sphinx_builder, start_link, [IP, Port, Count]}, permanent, 1000, worker, [sphinx_builder]},
 	Indexer = {sphinx_xml, {sphinx_xml, start_link, []}, permanent, 1000, worker, [sphinx_xml]},
-	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", 0]}, permanent, 1000, worker, [vlog]},
+	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", 1]}, permanent, 1000, worker, [vlog]},
 	Children = [Logger, Builder, Indexer],
     {ok, {Spec, Children}}.
 

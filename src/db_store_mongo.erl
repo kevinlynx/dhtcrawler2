@@ -32,9 +32,14 @@ init(Host, Port) ->
 	Conn.
 
 init(Conn) ->
-	enable_text_search(Conn),
-	ensure_search_index(Conn),
-	ensure_numid_index(Conn),
+	case config:get(search_method, mongodb) of
+		mongodb ->
+			io:format("use mongod text search~n", []),
+			enable_text_search(Conn),
+			ensure_search_index(Conn);
+		sphinx ->
+			io:format("use sphinx search~n", [])
+	end,
 	ok.
 
 close(Conn) ->
@@ -114,7 +119,7 @@ index(Conn, Hash) when is_list(Hash) ->
 	end.
 
 insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
-	NewDoc = create_torrent_desc(Conn, Hash, Name, Length, 1, Files),
+	NewDoc = create_torrent_desc(Hash, Name, Length, 1, Files),
 	% TODO: because of the hash_cache_writer, the new inserted torrent lost the req_cnt value
 	db_daterange:insert(Conn, Hash, 1, true),
 	mongo_do(Conn, fun() ->
@@ -124,7 +129,7 @@ insert(Conn, Hash, Name, Length, Files) when is_list(Hash) ->
 	end).
 
 unsafe_insert(Conn, Tors) when is_list(Tors) ->
-	Docs = [create_torrent_desc(Conn, Hash, Name, Length, 1, Files) || 
+	Docs = [create_torrent_desc(Hash, Name, Length, 1, Files) || 
 				{Hash, Name, Length, Files} <- Tors],
 	mongo:do(unsafe, master, Conn, ?DBNAME, fun() ->
 		mongo:insert(?COLLNAME, Docs)
@@ -157,18 +162,6 @@ ensure_search_index(Conn) ->
 		mongo:ensure_index(?COLLNAME, Spec)
 	end).
 
--ifdef(SPHINX).
-ensure_numid_index(Conn) ->
-	io:format("sphinx is enabled, ensure numid index for sphinx~n", []),
-	Spec = {key, {numid, 1}},
-	mongo_do(Conn, fun() ->
-		mongo:ensure_index(?COLLNAME, Spec)
-	end).
--else.
-ensure_numid_index(_Conn) ->
-	io:format("sphinx is disabled, use mongodb text search instead~n", []).
--endif.
-
 % not work
 enable_text_search(Conn) ->
 	Cmd = {setParameter, 1, textSearchEnabled, true},
@@ -176,32 +169,27 @@ enable_text_search(Conn) ->
 		mongo:command(Cmd)
 	end).
 
--ifdef(SPHINX).
-create_torrent_desc(Conn, Hash, Name, Length, Announce, Files) ->
-	{'_id', list_to_binary(Hash),
-      % steven told me it's necessary for sphinx, what if the doc already exists ?
-	  numid, db_system:get_torrent_id(Conn), 
+create_torrent_desc(Hash, Name, Length, Announce, Files) ->
+	Base = {
+	  '_id', list_to_binary(Hash),
 	  name, list_to_binary(Name),
 	  length, Length,
 	  created_at, time_util:now_seconds(),
 	  announce, Announce,
-	  files, encode_file_list(Files)}.
--else.
-create_torrent_desc(_Conn, Hash, Name, Length, Announce, Files) ->
-	NameArray = seg_text(Name, Files),
-	{'_id', list_to_binary(Hash),
-	  name, list_to_binary(Name),
-	  name_array, NameArray,
-	  length, Length,
-	  created_at, time_util:now_seconds(),
-	  announce, Announce,
-	  files, encode_file_list(Files)}.
+	  files, encode_file_list(Files)},
+	case config:get(use_sphinx, false) of
+		false ->
+			NameArray = seg_text(Name, Files),
+			erlang:append_element(erlang:append_element(Base, name_array),
+				NameArray);
+		true ->
+			Base
+	end.
 
 seg_text(Name, _Files) ->
 	%FullName = lists:foldl(fun({S, _}, Acc) -> Acc ++ " " ++ S end, Name, Files),
 	%tor_name_seg:seg_text(FullName).
 	tor_name_seg:seg_text(Name).
--endif.
 
 % {file1, {name, xx, length, xx}, file2, {name, xx, length, xx}}
 encode_file_list(Files) ->

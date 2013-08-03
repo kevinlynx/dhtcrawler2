@@ -24,7 +24,7 @@ search(Conn, Key, Offset, Count) ->
     end,
     T3 = now(),
     Stats = {timer:now_diff(T2, T1), timer:now_diff(T3, T2)},
-    {Stats, TDocs}.
+    {TDocs, Stats}.
 
 decode_search_ret(Conn, Ret) ->
 	Hashes = [translate_hash(Item) || Item <- Ret],

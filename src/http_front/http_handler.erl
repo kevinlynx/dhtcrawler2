@@ -5,13 +5,13 @@
 %%
 -module(http_handler).
 -export([search/3,
-		 sphinx_search/3,
 		 test_search/1,
 		 index/3,
 		 stats/3,
 		 real_stats/3,
 		 recent/3,
 		 today_top/3,
+		 do_search/2,
 		 top/3]).
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -import(torrent_file, [size_string/1]).
@@ -26,21 +26,9 @@ search(SessionID, Env, Input) ->
 		Key ->
 			US = http_common:list_to_utf_binary(Key),
 			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
-			{Key, do_search(Key)}
-	end,
-	Response = simple_html(K, Body),
-	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
-
-sphinx_search(SessionID, Env, Input) ->
-	{K, Body} = case http_common:get_search_keyword(Input) of
-		[] -> 
-			{"", "invalid input"};
-		Key ->
-			US = http_common:list_to_utf_binary(Key),
-			?LOG_STR(?INFO, ?FMT("remote ~p search /~s/", [http_common:remote_addr(Env), US])),
 			Args = http_common:parse_args(Input),
 			Page = case proplists:get_value("p", Args) of undefined -> 0; Val -> list_to_integer(Val) end,
-			{Key, do_search_sphinx(Key, Page)}
+			{Key, do_search(Key, Page)}
 	end,
 	Response = simple_html(K, Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
@@ -49,14 +37,14 @@ top(SessionID, _Env, _Input) ->
 	Rets = db_frontend:all_top(),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	Response = simple_html("top", Body),
+	Response = simple_html("", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 today_top(SessionID, _Env, _Input) ->
 	Rets = http_cache:today_top(),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	Response = simple_html("today_top", Body),
+	Response = simple_html("", Body),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 
 recent(SessionID, _Env, _Input) ->
@@ -97,13 +85,18 @@ simple_html(Key, Body) ->
 	
 test_search(Keyword) ->
 	Filename = ?TEXT("search_~s.html", [Keyword]),
-	Body = do_search(Keyword),
+	Body = do_search(Keyword, 0),
 	file:write_file(Filename, simple_html(Keyword, Body)).
 
-do_search(Keyword) when length(Keyword) =< 1 ->
-	too_short_tip();
+do_search(Keyword, Page) ->
+	case config:get(search_method, mongodb) of
+		mongodb ->
+			search_by_mongo(Keyword);
+		sphinx ->
+			search_by_sphinx(Keyword, Page)
+	end.
 
-do_search(Keyword) ->
+search_by_mongo(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
 	CostSecs = Cost / 1000 / 1000,
@@ -115,15 +108,15 @@ do_search(Keyword) ->
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body.
 	
-do_search_sphinx(Keyword, Page) ->
-	{Stats, Rets} = db_frontend:search_by_sphinx(Keyword, Page, ?COUNT_PER_PAGE + 1),
-	{SphinxTime, DBTime} = Stats,
+search_by_sphinx(Keyword, Page) ->
+	{Rets, _Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	US = http_common:list_to_utf_binary(Keyword),
+	?LOG_STR(?INFO, ?FMT("search /~s/ found ~p, cost ~b sp ms, ~b db ms", 
+		[US, length(Rets), 0, 0])),
 	ThisPage = lists:sublist(Rets, ?COUNT_PER_PAGE),
-	StatsDesc = ?TEXT("<h4>search ~s, sphinx ~f ms, db ~f ms</h4>", 
-		[Keyword, SphinxTime / 1000, DBTime / 1000]),
 	BodyList = format_search_result(ThisPage),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	StatsDesc ++ Body ++ append_page_nav(Keyword, Page, Rets).
+	Body ++ append_page_nav(Keyword, Page, Rets).
 
 append_page_nav(Key, Page, ThisRet) ->
 	Nav = case length(ThisRet) of 
@@ -145,7 +138,7 @@ append_page_nav(Key, Page, ThisRet) ->
 	"<p class=\"page-nav\">" ++ Nav ++ "</p>".
 
 format_page_nav(Key, Page, Tip) ->
-	?TEXT("<a href=\"http_handler:sphinx_search?q=~s&p=~p\">~s</a>", [Key, Page, Tip]).
+	?TEXT("<a href=\"http_handler:search?q=~s&p=~p\">~s</a>", [Key, Page, Tip]).
 
 format_search_result(RetList) ->
 	[format_one_result(Result, false) || Result <- RetList].
@@ -161,9 +154,9 @@ format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
 	?TEXT("<li><p class=\"search-title\">
 		<a target='_blank' href=\"/e/http_handler:index?q=~s\">~s</a></p><ul>~s</ul>",
 		[Hash, Name, format_files(SortedFiles, ShowAll)]) ++
-	?TEXT("<p class=\"search-detail\">Index at: ~s  |  File count: ~p  |  Query count: ~p
+	?TEXT("<p class=\"search-detail\">Index at: ~s | File count: ~p | Query count: ~p | Total Size: ~s
 		<a href=\"~s\" class=\"download-tip\">  Download</a></p>",
-		[format_time_string(CTime), length(Files), Announce, format_magnet(Hash)]).
+		[format_time_string(CTime), length(Files), Announce, size_string(http_common:total_size(Files)), format_magnet(Hash)]).
 
 format_files(Files, false) ->
 	Sub = case length(Files) > 3 of
@@ -214,7 +207,3 @@ format_time_string(Secs) ->
 format_date_string(Secs) ->
 	{{Y, M, D}, _} = time_util:seconds_to_local_time(Secs),
 	?TEXT("~b-~2..0b-~2..0b", [Y, M, D]).
-
-too_short_tip() ->
-	"too short keyword, you're going to kill me, enjoy this " ++ 
-	"<a href='/e/http_handler:search?q=girl'>girl</a>".

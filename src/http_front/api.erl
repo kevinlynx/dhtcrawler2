@@ -14,6 +14,7 @@
 -define(MAX_FILE, 3).
 -define(CONTENT_TYPE, "Content-Type: application/json\r\n\r\n").
 -include("vlog.hrl").
+-define(COUNT_PER_PAGE, 10).
 
 % search?q=keyword
 search(SessionID, Env, Input) ->
@@ -23,7 +24,9 @@ search(SessionID, Env, Input) ->
 		Keyword ->
 			US = http_common:list_to_utf_binary(Keyword),
 			?LOG_STR(?INFO, ?FMT("API: remote ~p search /~s/", [http_common:remote_addr(Env), US])),
-			do_search(Keyword)
+			Args = http_common:parse_args(Input),
+			Page = case proplists:get_value("p", Args) of undefined -> 0; Val -> list_to_integer(Val) end,
+			do_search(Keyword, Page)
 	end,	
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Res]).
 
@@ -48,13 +51,31 @@ stats(SessionID, _Env, _Input) ->
 	Response = format_stats_list(http_cache:stats()),
 	mod_esi:deliver(SessionID, [?CONTENT_TYPE, Response]).
 %%
-do_search(Keyword) ->
+do_search(Keyword, Page) ->
+	case config:get(search_method, mongodb) of
+		mongodb ->
+			search_by_mongo(Keyword);
+		sphinx ->
+			search_by_sphinx(Keyword, Page)
+	end.
+
+search_by_mongo(Keyword) ->
 	{Rets, Stats} = http_cache:search(Keyword),
 	{_Found, Cost, Scanned} = Stats,
-	CostSecs = Cost / 1000 / 1000,
 	US = http_common:list_to_utf_binary(Keyword),
-	?LOG_STR(?INFO, ?FMT("API: search /~s/ found ~p, cost ~f secs", [US, Scanned, CostSecs])),
-	Tip = ?TEXT("{\"keyword\":\"~s\",\"found\":~p,\"cost\":~p,", [Keyword, Scanned, Cost div 1000]),
+	?LOG_STR(?INFO, ?FMT("API: search /~s/ found ~p, ", [US, Scanned])),
+	Tip = ?TEXT("{\"keyword\":\"~s\",\"found\":~p,\"cost\":~p,\"page\":0,", 
+		[Keyword, Scanned, Cost div 1000]),
+	BodyList = format_search_result(Rets),
+	Body = ?TEXT("\"results\":[~s]}", [BodyList]),
+	Tip ++ Body.
+
+search_by_sphinx(Keyword, Page) ->
+	{Rets, _Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	US = http_common:list_to_utf_binary(Keyword),
+	?LOG_STR(?INFO, ?FMT("API: search /~s/ found ~p, ", [US, length(Rets)])),
+	Tip = ?TEXT("{\"keyword\":\"~s\",\"found\":~p,\"cost\":~p,\"page\":~p,", 
+		[Keyword, length(Rets), 0, Page]),
 	BodyList = format_search_result(Rets),
 	Body = ?TEXT("\"results\":[~s]}", [BodyList]),
 	Tip ++ Body.
@@ -85,8 +106,8 @@ format_one_result({multi, Hash, {Name, Files}, Announce, CTime}, ShowAll) ->
 % 	"files":[{"name":"abc", "size":size}]}
 format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
 	SortedFiles = http_common:sort_file_by_size(Files),
-	?TEXT("{\"hash\":\"~s\",\"name\":\"~s\",\"created_at\":~p,\"req\":~p,\"file_cnt\":~p,",
-		[Hash, Name, CTime, Announce, length(Files)]) ++
+	?TEXT("{\"hash\":\"~s\",\"name\":\"~s\",\"created_at\":~p,\"req\":~p,\"file_cnt\":~p,\"total\":~p,",
+		[Hash, Name, CTime, Announce, length(Files), http_common:total_size(Files)]) ++
 	"\"files\":[" ++ format_files(SortedFiles, ShowAll) ++ "]}".
 
 format_files([], _) ->
@@ -135,5 +156,5 @@ format_stats(Stats) ->
 %%
 test_search(Keyword) ->
 	Filename = ?TEXT("search_~s.html", [Keyword]),
-	Body = do_search(Keyword),
+	Body = do_search(Keyword, 2),
 	file:write_file(Filename, Body).

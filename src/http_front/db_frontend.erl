@@ -6,7 +6,7 @@
 -module(db_frontend).
 -export([start/3,
 		 search/1,
-		 search_by_sphinx/3,
+		 search/3,
 		 today_top/0,
 		 search_one/1,
 		 stats/0,
@@ -25,13 +25,17 @@ stop() ->
 	mongo_sup:stop_pool(?DB_POOLNAME).
 
 search(Keyword) ->
-	Conn = mongo_pool:get(?DB_POOLNAME),
-	db_store_mongo:search(Conn, Keyword).
+	search(Keyword, 0, 0).
 
-search_by_sphinx(Keyword, Page, Count) ->
-	Offset = Page * Count,
+search(Keyword, Page, Count) ->
 	Conn = mongo_pool:get(?DB_POOLNAME),
-	sphinx_search:search(Conn, Keyword, Offset, Count).
+	case config:get(search_method, mongodb) of
+		mongodb ->
+			db_store_mongo:search(Conn, Keyword);
+		sphinx ->
+			Offset = Page * Count,
+			sphinx_search:search(Conn, Keyword, Offset, Count)
+	end.
 
 today_top() ->
 	Conn = mongo_pool:get(?DB_POOLNAME),
