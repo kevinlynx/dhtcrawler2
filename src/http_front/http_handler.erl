@@ -135,7 +135,7 @@ append_page_nav(Key, ThisPage, Total) ->
 	Links = lists:foldl(fun(I, Str) ->
 		D = I + 1,
 		Str ++ if I == ThisPage ->
-			integer_to_list(D);
+			?TEXT("&nbsp;~p&nbsp;", [D]);
 			true ->format_page_nav(Key, I, integer_to_list(D))
 		end
 	end, [], lists:seq(StartPage, EndPage)),
