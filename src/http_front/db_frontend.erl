@@ -33,7 +33,7 @@ search(Keyword, Page, Count) ->
 		mongodb ->
 			db_store_mongo:search(Conn, Keyword);
 		sphinx ->
-			Offset = Page * Count,
+			Offset = Page * Count - if Page > 0 -> 1; true -> 0 end,
 			sphinx_search:search(Conn, Keyword, Offset, Count)
 	end.
 

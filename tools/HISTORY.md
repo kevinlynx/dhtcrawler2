@@ -1,3 +1,7 @@
+## 08.03.2013
+
+* sphinx searching is stable right now, you can config to use it
+
 ## 07.30.2013
 
 * add sphinx (coreseek which based on sphinx) to help searhcing, in expirement stage

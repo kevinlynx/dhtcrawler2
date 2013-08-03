@@ -5,26 +5,33 @@
 %%
 -module(sphinx_search).
 -include("vlog.hrl").
--export([search/4]).
+-export([search/4, search_hash/3]).
 -define(PORT, 9312).
 -define(INDEX, "xml").
 
 search(Conn, Key, Offset, Count) ->
+    Rets = search_hash(Key, Offset, Count),
+    TotalFound = proplists:get_value(total_found, Rets),
+    CostTime = proplists:get_value(time, Rets),
+    Hashes = proplists:get_value(match, Rets),
+    T1 = now(),
+    Tors = decode_search_ret(Conn, Hashes),
+    DBUsed = timer:now_diff(now(), T1),
+    Stats = {TotalFound, CostTime, DBUsed},
+    {Tors, Stats}.
+
+search_hash(Key, Offset, Count) ->
     Q1 = giza_query:new(?INDEX, Key),
     Q2 = giza_query:port(Q1, ?PORT),
     Q3 = giza_query:offset(Q2, Offset),
     Q4 = giza_query:limit(Q3, Count),
-    T1 = now(),
-    {T2, TDocs} = case catch giza_request:send(Q4) of
-    	{'EXIT', R} ->
-    		?W(?FMT("sphinx search error ~p", [R])),
-    		{now(), []};
-    	{ok, Ret} ->
-    		{now(), decode_search_ret(Conn, Ret)}
-    end,
-    T3 = now(),
-    Stats = {timer:now_diff(T2, T1), timer:now_diff(T3, T2)},
-    {TDocs, Stats}.
+    case catch giza_request:send(Q4) of
+        {'EXIT', R} ->
+            ?W(?FMT("sphinx search error ~p", [R])),
+            failed;
+        {ok, Ret} ->
+            Ret
+    end.
 
 decode_search_ret(Conn, Ret) ->
 	Hashes = [translate_hash(Item) || Item <- Ret],

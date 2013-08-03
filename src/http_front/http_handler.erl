@@ -11,12 +11,13 @@
 		 real_stats/3,
 		 recent/3,
 		 today_top/3,
-		 do_search/2,
+		 append_page_nav/3,
 		 top/3]).
 -define(TEXT(Fmt, Args), lists:flatten(io_lib:format(Fmt, Args))).
 -import(torrent_file, [size_string/1]).
 -define(CONTENT_TYPE, "Content-Type: text/html\r\n\r\n").
 -define(COUNT_PER_PAGE, 10).
+-define(PAGE_NAV_MAX, 10).
 -include("vlog.hrl").
 
 search(SessionID, Env, Input) ->
@@ -109,36 +110,40 @@ search_by_mongo(Keyword) ->
 	Tip ++ Body.
 	
 search_by_sphinx(Keyword, Page) ->
-	{Rets, _Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	{Rets, Stats} = db_frontend:search(Keyword, Page, ?COUNT_PER_PAGE + 1),
+	{TotalFound, CostTime, DBTime} = Stats,
 	US = http_common:list_to_utf_binary(Keyword),
 	?LOG_STR(?INFO, ?FMT("search /~s/ found ~p, cost ~b sp ms, ~b db ms", 
-		[US, length(Rets), 0, 0])),
+		[US, length(Rets), CostTime, DBTime])),
 	ThisPage = lists:sublist(Rets, ?COUNT_PER_PAGE),
+	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds, db ~f seconds</h4>", 
+		[Keyword, TotalFound, CostTime / 1000, DBTime / 1000 / 1000]),
 	BodyList = format_search_result(ThisPage),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
-	Body ++ append_page_nav(Keyword, Page, Rets).
+	Tip ++ Body ++ append_page_nav(Keyword, Page, TotalFound).
 
-append_page_nav(Key, Page, ThisRet) ->
-	Nav = case length(ThisRet) of 
-		0 when Page > 0 ->
-			format_page_nav(Key, Page - 1, "Prev");
-		0 -> 
-			[];
-		Size when Page > 0 ->
-			format_page_nav(Key, Page - 1, "Prev") ++ 
-			if Size > ?COUNT_PER_PAGE -> 
-				"&nbsp;" ++ format_page_nav(Key, Page + 1, "Next");
-				true -> []
-			end;
-		Size ->
-			if Size > ?COUNT_PER_PAGE -> format_page_nav(Key, Page + 1, "Next");
-				true -> []
-			end
+append_page_nav(Key, ThisPage, Total) ->
+	TotalPage = Total div ?COUNT_PER_PAGE,
+	StartPage = case ThisPage - ?PAGE_NAV_MAX div 3 of
+		N when N < 0 -> 0;
+		N -> N
 	end,
-	"<p class=\"page-nav\">" ++ Nav ++ "</p>".
+	EndPage = case StartPage + ?PAGE_NAV_MAX of
+		E when E > TotalPage -> TotalPage;
+		E -> E
+	end,
+	Links = lists:foldl(fun(I, Str) ->
+		D = I + 1,
+		Str ++ if I == ThisPage ->
+			integer_to_list(D);
+			true ->format_page_nav(Key, I, integer_to_list(D))
+		end
+	end, [], lists:seq(StartPage, EndPage)),
+	FirstTip = if StartPage > 0 -> format_page_nav(Key, 0, "1") ++ "..."; true -> [] end,
+	"<p class=\"page-nav\">" ++ FirstTip ++ Links ++ "</p>".
 
 format_page_nav(Key, Page, Tip) ->
-	?TEXT("<a href=\"http_handler:search?q=~s&p=~p\">~s</a>", [Key, Page, Tip]).
+	?TEXT("&nbsp;<a href=\"http_handler:search?q=~s&p=~p\">~s</a>&nbsp;", [Key, Page, Tip]).
 
 format_search_result(RetList) ->
 	[format_one_result(Result, false) || Result <- RetList].

@@ -41,6 +41,9 @@ a.download-tip {
 span.file-size {
   color:#888;
 }
+p.page-nav {
+    text-align:center;
+}
 </style>
 </head>
 <body>
