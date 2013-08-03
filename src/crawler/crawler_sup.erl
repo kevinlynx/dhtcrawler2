@@ -24,7 +24,8 @@ srv_name() ->
 init([{StartPort, Count, DBHost, DBPort, LogLevel, DBConn, CacheTime, HashCacheMax}]) ->
 	Spec = {one_for_one, 1, 600},
 	Instances = create_dht_instance(StartPort, Count),
-	Logger = [{dht_logger, {vlog, start_link, ["dht_crawler.txt", LogLevel]},
+	filelib:ensure_dir("log/"),
+	Logger = [{dht_logger, {vlog, start_link, ["log/dht_crawler.txt", LogLevel]},
 					permanent, 2000, worker, dynamic}],
 	HashInserter = [{hash_cache_writer, {hash_cache_writer, start_link, [DBHost, DBPort, DBConn, CacheTime, HashCacheMax]},
 					permanent, 2000, worker, dynamic}],

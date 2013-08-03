@@ -136,7 +136,8 @@ date_string() ->
 -define(TEXT(Fmt, Arg), lists:flatten(io_lib:format(Fmt, Arg))).
 
 do_dump(State) ->
-	{ok, FP} = file:open("dhtcrawler-stats.txt", [append]),
+	filelib:ensure_dir("log/"),
+	{ok, FP} = file:open("log/dhtcrawler-stats.txt", [append]),
 	io:format(FP, "~s~n", [date_string()]),
 	io:format(FP, "~s~n", [format_stats(State)]),
 	file:close(FP).

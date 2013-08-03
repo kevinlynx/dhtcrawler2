@@ -30,7 +30,8 @@ do_start() ->
 	crawler_sup:start_link({StartPort, Count, DBHost, DBPort, LogLevel, DBConn, CacheMaxTime, CacheMaxCount}).
 
 start() ->
-	error_logger:logfile({open, "crash.log"}),
+	filelib:ensure_dir("log/"),
+	error_logger:logfile({open, "log/crash.log"}),
 	code:add_path("deps/bson/ebin"),
 	code:add_path("deps/kdht/ebin"),
 	code:add_path("deps/mongodb/ebin"),
