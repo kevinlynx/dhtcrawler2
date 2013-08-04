@@ -19,7 +19,7 @@
 		 search_recently/2,
 		 search_newest_top/3,
 		 search/2]).
--export([decode_torrent_item/1]).
+-export([decode_torrent_item/1, ensure_date_index/1]).
 -compile(export_all).
 -define(DBNAME, torrents).
 -define(COLLNAME, hashes).
@@ -158,6 +158,12 @@ inc_announce(Conn, Hash, Inc) when is_list(Hash) ->
 
 ensure_search_index(Conn) ->
 	Spec = {key, {?SEARCH_COL, <<"text">>}},
+	mongo_do(Conn, fun() ->
+		mongo:ensure_index(?COLLNAME, Spec)
+	end).
+
+ensure_date_index(Conn) ->
+	Spec = {key, {created_at, 1}},
 	mongo_do(Conn, fun() ->
 		mongo:ensure_index(?COLLNAME, Spec)
 	end).

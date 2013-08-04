@@ -27,8 +27,8 @@ srv_name() ->
 init([IP, Port, WorkerCnt]) ->
 	?I(?FMT("spawn ~p workers", [WorkerCnt])),
 	[spawn_link(?MODULE, worker_run, []) || _ <- lists:seq(1, WorkerCnt)],
-	Offset = load_result(),
-	sphinx_torrent:start_link(IP, Port, Offset),
+	{Offset, Date} = load_result(),
+	sphinx_torrent:start_link(IP, Port, Date),
 	{ok, #state{processed = Offset, worker_cnt = WorkerCnt}}.
 
 handle_call({get, Pid}, _From, State) ->
@@ -103,16 +103,18 @@ load_result() ->
 	case file:consult(?STATE_FILE) of
 		{error, _Reason} ->
 			io:format("start a new processing~n", []),
-			0;
+			{0, 0};
 		{ok, [Ret]} ->
 			Sum = proplists:get_value(processed, Ret),
-			io:format("continue to process from ~p~n", [Sum]),
-			Sum
+			DateSecs = proplists:get_value(offset_date, Ret),
+			io:format("continue to process from ~s~n", [time_util:date_time_string(DateSecs)]),
+			{Sum, DateSecs}
 	end.
 
 save_result(Sum) ->
-	Ret = [{processed, Sum}],
-	io:format("save result ~p~n", [Sum]),
+	DateSecs = sphinx_torrent:offset_date(),
+	Ret = [{processed, Sum}, {offset_date, DateSecs}],
+	io:format("save result ~s~n", [time_util:date_time_string(DateSecs)]),
 	file:write_file(?STATE_FILE, io_lib:fwrite("~p.\n",[Ret])).
 
 check_progress(Sum) ->
