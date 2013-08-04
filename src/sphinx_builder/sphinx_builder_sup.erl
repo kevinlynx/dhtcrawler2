@@ -44,14 +44,16 @@ srv_name() ->
 init([IP, Port, Count]) ->
 	Spec = {one_for_one, 1, 600},
 	config:start_link("sphinx_builder.config", fun() -> config_default() end),
+	LogLevel = config:get(log_level, 1),
 	Builder = {sphinx_builder, {sphinx_builder, start_link, [IP, Port, Count]}, permanent, 1000, worker, [sphinx_builder]},
 	Indexer = {sphinx_xml, {sphinx_xml, start_link, []}, permanent, 1000, worker, [sphinx_xml]},
-	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", 0]}, permanent, 1000, worker, [vlog]},
+	Logger = {vlog, {vlog, start_link, ["log/sphinx_build.log", LogLevel]}, permanent, 1000, worker, [vlog]},
 	Children = [Logger, Builder, Indexer],
     {ok, {Spec, Children}}.
 
 config_default() ->
 	[{max_doc_per_file, 1000},
+	 {log_level, 1},
 	 {torrent_batch_count, 100},
 	 {main_source_file, "var/source/main.xml"},
 	 {delta_source_file, "var/source/delta.xml"},
