@@ -35,6 +35,7 @@ init([{StartPort, Count, DBHost, DBPort, LogLevel, DBConn, CacheTime, HashCacheM
     {ok, {Spec, Children}}.
 
 create_dht_instance(StartPort, Count) ->
+	random:seed(now()),
 	Dir = "dhtstate/",
 	filelib:ensure_dir(Dir),
 	IDs = create_discrete_ids(Count),
