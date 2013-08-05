@@ -89,7 +89,6 @@ worker_run() ->
 	worker_run().
 
 do_process({_, wait}) ->
-	?T(?FMT("worker ~p sleep ~p ms", [self(), ?WORKER_WAIT])),
 	timer:sleep(?WORKER_WAIT);
 do_process({ID, Doc}) ->
 	case db_store_mongo:decode_torrent_item(Doc) of

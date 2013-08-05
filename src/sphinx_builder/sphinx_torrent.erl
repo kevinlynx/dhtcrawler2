@@ -13,6 +13,7 @@
          terminate/2,
          code_change/3]).
 -export([start_link/3, get/0, offset_date/0, try_times/0]).
+-import(time_util, [date_time_string/1]).
 -define(DBNAME, torrents).
 -define(COLLNAME, hashes).
 -define(POOLNAME, db_pool).
@@ -42,7 +43,7 @@ init([IP, Port, Date]) ->
 	Conn = mongo_pool:get(?POOLNAME),
 	db_store_mongo:ensure_date_index(Conn),
 	CheckDate = find_first_date(Date),
-	io:format("load torrent from ~s~n", [time_util:date_time_string(CheckDate)]),
+	io:format("load torrent from ~s~n", [date_time_string(CheckDate)]),
 	{ok, #state{date = CheckDate, max = Max}, 0}.
 
 handle_cast(stop, State) ->
@@ -52,14 +53,18 @@ handle_info(try_load, State) ->
 	#state{date = Date, tors = Tors, max = Max, try_times = Try} = State,
 	case length(Tors) < Max of 
 		true ->
+			?T(?FMT("try load more torrents ~p -> ~p", [length(Tors), Max])),
 			case do_load_torrents(Date, Max) of
 				[] ->
+					?T(?FMT("load 0 torrent from ~s", [date_time_string(Date)])),
 					NewDate = forward_date(Date),
 					NewTry = case NewDate == Date of
 						true ->
+							?T(?FMT("no more torrents, wait, try ~p", [Try])),
 							timer:send_after(?WAIT_TIME, try_load),
 							Try + 1; 
 						false -> 
+							?T(?FMT("forward date to ~s", [date_time_string(NewDate)])),
 							timer:send_after(100, try_load),
 							Try 
 					end,
@@ -67,6 +72,7 @@ handle_info(try_load, State) ->
 				Ret ->
 					timer:send_after(100, try_load),
 					NewDate = query_created_at(lists:last(Ret)),
+					?T(?FMT("load ~p torrents, new date ~s", [length(Ret), date_time_string(NewDate)])),
 					{noreply, State#state{date = NewDate, tors = Tors ++ Ret, try_times = 0}}
 			end;
 		false ->
