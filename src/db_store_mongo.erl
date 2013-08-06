@@ -32,6 +32,7 @@ init(Host, Port) ->
 	Conn.
 
 init(Conn) ->
+	ensure_date_index(Conn),
 	case config:get(search_method, mongodb) of
 		mongodb ->
 			io:format("use mongod text search~n", []),
@@ -163,10 +164,12 @@ ensure_search_index(Conn) ->
 	end).
 
 ensure_date_index(Conn) ->
+	io:format("ensuring date index...", []),
 	Spec = {key, {created_at, 1}},
 	mongo_do(Conn, fun() ->
 		mongo:ensure_index(?COLLNAME, Spec)
-	end).
+	end),
+	io:format("done~n", []).
 
 % not work
 enable_text_search(Conn) ->
