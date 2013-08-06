@@ -114,7 +114,7 @@ search_by_sphinx(Keyword, Page) ->
 	{TotalFound, CostTime, DBTime} = Stats,
 	US = http_common:list_to_utf_binary(Keyword),
 	?LOG_STR(?INFO, ?FMT("search /~s/ found ~p, cost ~b sp ms, ~b db ms", 
-		[US, TotalFound, CostTime, DBTime / 1000])),
+		[US, TotalFound, CostTime, DBTime div 1000])),
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds, db ~f seconds</h4>", 
 		[Keyword, TotalFound, CostTime / 1000, DBTime / 1000 / 1000]),
 	BodyList = format_search_result(Rets),
