@@ -1,6 +1,6 @@
 {application,dhtcrawler,
              [{description,"A DHT crawler to index magnet hash to torrent"},
-              {vsn,"f16d25d"},
+              {vsn,"f887208"},
               {registered,[dht_crawler_sup]},
               {applications,[kernel,stdlib,crypto,public_key,ssl,inets,bson,
                              mongodb]},
@@ -17,8 +17,8 @@
                         loc_torrent_sup,name_seger,rmmseg,sphinx_builder,
                         sphinx_builder2,sphinx_builder_sup,sphinx_cmd,
                         sphinx_doc,sphinx_id,sphinx_search,sphinx_torrent,
-                        sphinx_xml,string_split,string_util,time_util,
-                        tor_builder,tor_download,tor_download_stats,
+                        sphinx_torrent2,sphinx_xml,string_split,string_util,
+                        time_util,tor_builder,tor_download,tor_download_stats,
                         tor_location,tor_location_reader,tor_location_writer,
                         tor_name_seg,torrent_file,transfer,urldecode,vlog,
                         xmerl_xml_cdata]}]}.
