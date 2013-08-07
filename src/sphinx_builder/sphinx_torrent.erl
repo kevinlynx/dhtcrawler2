@@ -112,7 +112,7 @@ forward_date(Date) ->
 
 % will cause lots of queries
 do_load_torrents(Date, Size) ->
-	Q = {created_at, {'$gt', Date, '$lt', Date + ?DATE_RANGE}},
+	Q = {created_at, {'$gt', Date, '$lte', Date + ?DATE_RANGE}},
 	Conn = mongo_pool:get(?POOLNAME),
 	mongo:do(safe, master, Conn, ?DBNAME, fun() ->
 		% 1: cost lots of memory even close the cursor
@@ -122,7 +122,7 @@ do_load_torrents(Date, Size) ->
 		%Cursor = mongo:find(?COLLNAME, {}, {}, Skip),
 		%mongo_cursor:take(Cursor, Size),
 		% 3:
-		Cursor = mongo:find(?COLLNAME, Q, {}),
+		Cursor = mongo:find(?COLLNAME, Q, {}, 0, Size),
 		Ret = mongo_cursor:take(Cursor, Size),
 		mongo_cursor:close(Cursor),
 		Ret

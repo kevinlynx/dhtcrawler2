@@ -71,7 +71,7 @@ search(Conn, Key) when is_list(Key) ->
 search_announce_top(Conn, Count) ->
 	Sel = {'$query', {}, '$orderby', {announce, -1}},
 	List = mongo_do_slave(Conn, fun() ->
-		% mongodb-erlang does not provide cursor.limit()/sort() functions, wired
+		% mongodb-erlang does not provide cursor.limit()/sort() functions, weird
 		% but it work here
 		Cursor = mongo:find(?COLLNAME, Sel, [], 0, Count), 
 		mongo_cursor:rest(Cursor)
@@ -342,4 +342,28 @@ test_compile() ->
 test_compile() ->
     io:format("sphins disabled~n", []).
 -endif.
+
+% about mongodb `batchsize' and `getmore':http://blog.nosqlfan.com/html/3996.html
+% looks like the `batchsize' argument will take effect on `getmore' command
+% 1. load `Batch' docs first, then take them all
+% Cursor = mongo:find(?COLLNAME, {}, [], 0, Batch),
+% mongo_cursor:take(Cursor, Batch) 
+% 2. default load 101 docs first
+% Cursor = mongo:find(?COLLNAME, {}, [], 0, 0),
+% mongo_cursor:take(Cursor, Batch) 
+% 3. default load 101 docs first, then `getmore' to load 4M data
+% Cursor = mongo:find(?COLLNAME, {}, [], 0, 0),
+% mongo_cursor:take(Cursor, 102)
+% 4. load a batch of docs, and mongodb close the connection
+% Cursor = mongo:find(?COLLNAME, {}, [], 0, -Cnt),
+% mongo_cursor:rest(Cursor)
+test_batch(Cnt) ->
+	Conn = mongo_pool:get(db_pool),
+	mongo:do(safe, master, Conn, ?DBNAME, fun() ->
+		%Cursor = mongo:find(?COLLNAME, {}, [], 0, Cnt),
+		Cursor = mongo:find(?COLLNAME, {}, [], 0, -Cnt),
+		%mongo_cursor:take(Cursor, Cnt)
+		%mongo_cursor:take(Cursor, Cnt)
+		mongo_cursor:rest(Cursor)
+	end).
 
