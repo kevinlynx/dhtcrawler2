@@ -42,6 +42,10 @@ It's not related about dhtcrawler, but only Mongodb, try figure it yourself.
 
 Yes of course you can write another http front-end UI based on the torrent database, if you're interested in it I can help you about the database format.
 
+## Sphinx
+
+Yes, dhtcrawler2 support **sphinx** search. There's a tool named `sphinx-builder` load torrents from database and create sphinx index. `crawler-http` can also search text by sphinx. All you need is to config something.
+
 ## LICENSE
 
 See LICENSE.txt
