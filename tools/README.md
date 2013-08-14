@@ -44,7 +44,36 @@ Yes of course you can write another http front-end UI based on the torrent datab
 
 ## Sphinx
 
-Yes, dhtcrawler2 support **sphinx** search. There's a tool named `sphinx-builder` load torrents from database and create sphinx index. `crawler-http` can also search text by sphinx. All you need is to config something.
+Yes, dhtcrawler2 support **sphinx** search. There's a tool named `sphinx-builder` load torrents from database and create sphinx index. `crawler-http` can also search text by sphinx. 
+
+dhtcrawler2 use mongodb text search by default, to use sphinx, follow these steps below:
+
+* Download sphinx, the version tested is a fork version named `coreseek` which support Chinese characters. [coreseek4.1](http://www.coreseek.cn/news/14/52/)
+* unzip the binary archive and add `bin` directory to `PATH` environment variable, so that dhtcrawler can invoke `indexer` tool
+* config `etc/csft.conf` file
+    * add a delta index, i.e:
+        
+            source delta:xml
+            {
+                type = xmlpipe2
+                xmlpipe_command = cat g:/downloads/coreseek-4.1-win32/var/test/delta.xml
+            }
+            index delta:xml
+            {
+                source = delta
+                path = g:/downloads/coreseek-4.1-win32/var/data/delta
+            }
+
+    * change the other directories, better to use absolute path
+* run `win_init_sphinx_index.bat` to generate a default sphinx-builder config file, and terminate `win_init_sphinx_index.bat`
+* config `priv/sphinx_builder.config`, specify `main` and `delta` sphinx index source file name, `main` and `delta` index name and sphinx config file, these file names must match these configs you write in `etc/csft.conf`
+* run `win_init_sphinx_index.bat` again to initialize sphinx index file, terminate `win_init_sphinx_index.bat` and if it initialize sphinx index successfully, never run it again
+* run sphinx `searchd` server
+* run `win_start_sphinx_builder` to start sphinx-builder, it will read torrents from your torrent database and build the index into sphinx
+* change `priv/hash_reader.config` `search_method` to `sphinx`, so that `hash_reader` will not build mongodb text search index any more
+* change `priv/httpd.config` `search_method` to `sphinx`, so that `crawler-http` will search keyword by sphinx
+
+Lots of details! And you'd better to know sphinx well. 
 
 ## LICENSE
 
