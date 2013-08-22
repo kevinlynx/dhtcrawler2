@@ -61,10 +61,18 @@ stats() ->
 	Conn = mongo_pool:get(?DB_POOLNAME),
 	DaySecs = time_util:now_day_seconds(),
 	TorSum = db_store_mongo:count(Conn),
-	D1 = db_system:stats_day_at_slave(Conn, DaySecs),
-	D2 = db_system:stats_day_at_slave(Conn, DaySecs - ?ONEDAY_SECS),
-	D3 = db_system:stats_day_at_slave(Conn, DaySecs - 2 * ?ONEDAY_SECS),
+	D1 = load_stats(Conn, DaySecs),
+	D2 = load_stats(Conn, DaySecs - ?ONEDAY_SECS),
+	D3 = load_stats(Conn, DaySecs - 2 * ?ONEDAY_SECS),
 	{TorSum, [D1, D2, D3]}.
+
+load_stats(Conn, DaySecs) ->
+	case db_system:stats_day_at_slave(Conn, DaySecs) of
+		{} ->
+			{'_id', DaySecs};
+		Doc ->
+			Doc
+	end.
 
 % test only
 all_top() ->
