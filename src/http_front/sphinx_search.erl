@@ -8,6 +8,7 @@
 -export([search/4, search_hash/3, highlight_title/2, highlight_files/2]).
 -define(PORT, 9312).
 -define(INDEX, "xml").
+-compile(export_all).
 
 search(Conn, Key, Offset, Count) ->
     Rets = search_hash(Key, Offset, Count),
@@ -61,7 +62,7 @@ highlight_title(Key, Name) when is_list(Name) ->
 highlight_files(Key, Files) when is_list(Files) ->
     {Names, Lens} = lists:unzip(Files),
     BNames = [list_to_binary(Name) || Name <- Names],
-    case catch build_file_excerpts(list_to_binary(Key), BNames, 800) of
+    case catch build_file_excerpts(list_to_binary(?INDEX), list_to_binary(Key), BNames, 800) of
         {'EXIT', Reason} ->
             ?E(?FMT("highlight_files ~p", [Reason])),
             Files;
@@ -77,12 +78,23 @@ highlight_files(Key, Files) when is_list(Files) ->
             L1 ++ L2
     end.
 
-% too many files in one batch will cause error
-build_file_excerpts(BKey, BNames, Batch) ->
-    BIndex = list_to_binary(?INDEX),
-    Cnt = length(BNames) div Batch + 1,
-    SubNamesList = [lists:sublist(BNames, 1 + I * Batch, Batch) ||
-        I <- lists:seq(0, Cnt - 1)],
-    lists:flatten([sphinx_excerpt:build_excerpt(BKey, BName, BIndex) ||
-        BName <- SubNamesList]).
-
+build_file_excerpts(_BIndex, _BKey, [], _Batch)->
+    [];
+build_file_excerpts(BIndex, BKey, BNames, Batch) when length(BNames) < Batch ->
+    sphinx_excerpt:build_excerpt(BKey, BNames, BIndex);
+build_file_excerpts(BIndex, BKey, BNames, Batch)->
+    {SubNames, Rest} = lists:split(Batch, BNames),
+    Rets = sphinx_excerpt:build_excerpt(BKey, SubNames, BIndex),
+    Rets ++ case got_excerpt(Rets) of
+        true -> 
+            [<<>> || _ <- Rest];
+        false ->
+            build_file_excerpts(BIndex, BKey, Rest, Batch)
+    end.
+    
+got_excerpt([]) ->
+    false;
+got_excerpt([S|_]) when byte_size(S) > 0 ->
+    true;
+got_excerpt([_S|R]) ->
+    got_excerpt(R).
