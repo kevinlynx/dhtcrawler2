@@ -117,7 +117,8 @@ search_by_sphinx(Keyword, Page) ->
 		[US, TotalFound, CostTime, DBTime div 1000])),
 	Tip = ?TEXT("<h4>search ~s, ~b results, ~f seconds, db ~f seconds</h4>", 
 		[Keyword, TotalFound, CostTime / 1000, DBTime / 1000 / 1000]),
-	BodyList = format_search_result(Rets),
+	HRets = highlight_search_result(Keyword, Rets),
+	BodyList = format_search_result(HRets),
 	Body = ?TEXT("<ol>~s</ol>", [lists:flatten(BodyList)]),
 	Tip ++ Body ++ append_page_nav(Keyword, Page, TotalFound).
 
@@ -154,10 +155,10 @@ format_one_result({multi, Hash, {Name, Files}, Announce, CTime}, ShowAll) ->
 	format_one_result(Hash, Name, Files, Announce, CTime, ShowAll).
 
 format_one_result(Hash, Name, Files, Announce, CTime, ShowAll) ->
-	SortedFiles = http_common:sort_file_by_size(Files),
+	%SortedFiles = http_common:sort_file_by_size(Files),
 	?TEXT("<li><p class=\"search-title\">
 		<a target='_blank' href=\"/e/http_handler:index?q=~s\">~s</a></p><ul>~s</ul>",
-		[Hash, Name, format_files(SortedFiles, ShowAll)]) ++
+		[Hash, Name, format_files(Files, ShowAll)]) ++
 	?TEXT("<p class=\"search-detail\">Index at: ~s | File count: ~p | Query count: ~p | Total Size: ~s
 		<a href=\"~s\" class=\"download-tip\">  Download</a></p>",
 		[format_time_string(CTime), length(Files), Announce, size_string(http_common:total_size(Files)), format_magnet(Hash)]).
@@ -211,3 +212,15 @@ format_time_string(Secs) ->
 format_date_string(Secs) ->
 	{{Y, M, D}, _} = time_util:seconds_to_local_time(Secs),
 	?TEXT("~b-~2..0b-~2..0b", [Y, M, D]).
+
+% use sphinx excerpt to highlight result
+highlight_search_result(Key, RetList) ->
+	[highlight_one_result(Key, Result) || Result <- RetList].
+
+highlight_one_result(Key, {single, Hash, {Name, Length}, Announce, CTime}) ->
+	HighLName = sphinx_search:highlight_title(Key, Name),
+	{single, Hash, {HighLName, Length}, Announce, CTime};
+highlight_one_result(Key, {multi, Hash, {Name, Files}, Announce, CTime}) ->	
+	HighLName = sphinx_search:highlight_title(Key, Name),
+	{multi, Hash, {HighLName, sphinx_search:highlight_files(Key, Files)}, Announce, CTime}.	
+

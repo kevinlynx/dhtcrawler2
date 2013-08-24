@@ -5,7 +5,7 @@
 %%
 -module(sphinx_search).
 -include("vlog.hrl").
--export([search/4, search_hash/3]).
+-export([search/4, search_hash/3, highlight_title/2, highlight_files/2]).
 -define(PORT, 9312).
 -define(INDEX, "xml").
 
@@ -48,5 +48,41 @@ translate_hash({_DocID, Item}) ->
 	40 = length(Hash),
 	Hash.
 
+highlight_title(Key, Name) when is_list(Name) ->
+    R = case catch sphinx_excerpt:build_excerpt(list_to_binary(Key), [list_to_binary(Name)], list_to_binary(?INDEX)) of
+        {'EXIT', Reason} ->
+            ?E(?FMT("highlight_title ~p", [Reason])),
+            <<>>;
+        [Ret] ->
+            Ret
+    end,
+    if byte_size(R) == 0 -> Name; true -> binary_to_list(R) end.
 
+highlight_files(Key, Files) when is_list(Files) ->
+    {Names, Lens} = lists:unzip(Files),
+    BNames = [list_to_binary(Name) || Name <- Names],
+    case catch build_file_excerpts(list_to_binary(Key), BNames, 800) of
+        {'EXIT', Reason} ->
+            ?E(?FMT("highlight_files ~p", [Reason])),
+            Files;
+        Rets ->
+            {L1, L2} = lists:foldl(fun({BName, Name, Len}, Acc) ->
+                {HList, NHList} = Acc,
+                if byte_size(BName) == 0 ->
+                    {HList, [{Name, Len}|NHList]};
+                    true ->
+                    {[{binary_to_list(BName), Len}|HList], NHList}
+                end
+            end, {[], []}, lists:zip3(Rets, Names, Lens)),
+            L1 ++ L2
+    end.
+
+% too many files in one batch will cause error
+build_file_excerpts(BKey, BNames, Batch) ->
+    BIndex = list_to_binary(?INDEX),
+    Cnt = length(BNames) div Batch + 1,
+    SubNamesList = [lists:sublist(BNames, 1 + I * Batch, Batch) ||
+        I <- lists:seq(0, Cnt - 1)],
+    lists:flatten([sphinx_excerpt:build_excerpt(BKey, BName, BIndex) ||
+        BName <- SubNamesList]).
 
